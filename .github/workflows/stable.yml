@@ -1,4 +1,4 @@
-name: RICH LINUX (Cinnamon + Chrome Remote Desktop)
+name: cinnamon stable
 
 on:
   workflow_dispatch:

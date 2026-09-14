@@ -2,7 +2,7 @@
 
 [English](README.md) | **Bahasa Indonesia**
 
-> Ubuntu 24.04/26.04 di GitHub Actions + Chrome Remote Desktop. Pilih desktop **Cinnamon** yang ringan, **GNOME** yang stabil, atau **XFCE (Beta)** paling cepat — lalu remote dari mana saja dengan PIN.
+> Ubuntu 24.04/26.04 di GitHub Actions + Chrome Remote Desktop. Pilih desktop **Cinnamon** yang ringan, **GNOME** yang stabil, atau **XFCE (Beta)** paling cepat — lalu remote dari mana saja dengan PIN. Plus desktop **macOS 15** yang di-stream ke browser via noVNC + Cloudflare Quick Tunnel.
 
 <p align="center">
   <img src="assets/rich-linux-crd-banner.svg" alt="Banner RICH Linux CRD" width="820" />
@@ -19,6 +19,7 @@ Dokumen utama (lengkap, dalam Bahasa Inggris): [README.md](README.md). Halaman i
 - **Instalasi senyap** — hook needrestart dinonaktifkan, jadi tidak ada log `Scanning processes...` dan tidak ada restart layanan otomatis saat install/upgrade (mencegah sesi CRD putus).
 - **Tanpa snap** — `snapd` + deb transisi `thunderbird`/`firefox` di-purge dan di-hold, sehingga tidak ada hang "retry 30 menit ke snap store" saat install desktop. Tradeoff: `snap install` dan katalog Snap di GNOME Software tidak tersedia.
 - **XFCE Beta** — desktop ketiga, paling ringan & cepat (`xfce.yml`), memakai runner image **`ubuntu-26.04` public preview**. Label "beta" memang sengaja: image masih preview. KVM di image ini belum terverifikasi → warn-only.
+- **macOS 15** — desktop macOS asli (Apple Silicon arm64) via Screen Sharing bawaan + noVNC di browser + Cloudflare Quick Tunnel. Tanpa akun, tanpa API key, tanpa secret sama sekali.
 
 ![Arsitektur: input pengguna mengalir melalui instalasi GitHub Actions dan registrasi CRD ke koneksi browser](assets/architecture.svg)
 
@@ -95,6 +96,33 @@ Batasan beta yang jujur:
 - Theming memakai `xfconf` (settings daemon XFCE), bukan dconf/gsettings.
 - Nama perangkat CRD tampil sebagai **"xfce"** di halaman access.
 
+### macOS — Screen Sharing Bawaan via Browser
+
+Untuk yang menginginkan desktop **macOS asli** (Apple Silicon arm64) yang bisa diakses langsung dari browser modern apa pun — tanpa SSH, tanpa klien VNC, tanpa akun Google, tanpa akun Cloudflare, tanpa secret sama sekali.
+
+Workflow macOS (`macos.yml`) memakai tiga teknologi yang bekerja bersama:
+
+1. **Screen Sharing (server VNC bawaan macOS)** — port 5900, dilindungi password
+2. **noVNC** — klien VNC berbasis HTML5 di browser; disajikan lokal di port 6080
+3. **Cloudflare Quick Tunnel** — tunnel gratis yang membuat URL acak `*.trycloudflare.com` (tanpa akun atau API key)
+
+Setelah workflow selesai, log mencetak URL. Buka di browser, masukkan VNC password, dan Anda melihat desktop macOS Aqua lengkap dengan Chrome + VS Code + OpenCode yang sudah terpasang.
+
+Kelebihan:
+- **Nol secret**: tidak ada PIN CRD, tidak ada token ngrok, tidak ada akun Cloudflare/Google — cukup password yang Anda set saat menjalankan workflow
+- **Bisa dari mana saja** dengan browser (browser mobile juga didukung)
+- **Desktop Aqua penuh**: WindowServer, menu aplikasi, dock, Finder — GUI macOS sungguhan
+- **Apple Silicon**: macOS 15 berjalan di runner arm64 GitHub-hosted (3 vCPU / 7 GB RAM)
+- **Sleep dimatikan**: `pmset` + `caffeinate` menjaga sesi tetap hidup
+
+Batasan jujur:
+- Runner macOS memakai **10× lebih banyak Actions credits** per menit dibanding runner Linux (gratis di repo publik, berbayar di repo privat)
+- `/dev/kvm` **tidak ada** di macOS — virtualisasi QEMU/KVM tidak bisa jalan. VM macOS tetap bisa lewat UTM / Apple Virtualization.framework (fitur terpisah)
+- Izin Screen Recording (TCC) **tidak dibutuhkan** untuk Screen Sharing — `screensharingd` menangkap layar secara native, melewati TCC
+- URL Quick Tunnel **ephemeral** — saat workflow berhenti, URL ikut mati (siklus hidup sama seperti sesi CRD)
+- Masa hidup runner maksimal **6 jam** (timeout job Actions); untuk sesi lebih lama, jalankan ulang workflow
+- **Belum ada helper safe-upgrade** untuk macOS — gunakan `brew upgrade` manual di terminal (beda dengan `apt upgrade` di Linux, `brew upgrade` tidak me-restart stack display di tengah sesi)
+
 ### Upgrade Anti-Putus
 
 Menjalankan `sudo apt upgrade` di dalam sesi CRD memutus koneksi (karena me-restart service CRD/GNOME/systemd). Helper [`safe-upgrade`](scripts/safe-upgrade.sh) menyelesaikan ini:
@@ -137,8 +165,9 @@ Workflow memakai `workflow_dispatch`, jadi **harus dijalankan dari fork milik An
    - **RICH LINUX (Cinnamon + Chrome Remote Desktop)** → file `.github/workflows/cinnamon.yml`
    - **RICH LINUX (GNOME + Chrome Remote Desktop)** → file `.github/workflows/gnome.yml`
    - **RICH LINUX (XFCE Beta + Chrome Remote Desktop)** → file `.github/workflows/xfce.yml` (public-preview `ubuntu-26.04`, **beta**)
-3. Klik **Run workflow**, tempel perintah CRD ke field `crd_host_command`, klik **Run**.
-4. Tunggu sekitar 5–10 menit sampai log menampilkan `CHROME REMOTE DESKTOP READY`.
+   - **RICH LINUX (macOS + noVNC + Cloudflare Quick Tunnel)** → file `.github/workflows/macos.yml` (lihat bagian [macOS](#macos--screen-sharing-bawaan-via-browser))
+3. Klik **Run workflow**, tempel perintah CRD ke field `crd_host_command`, klik **Run** (untuk workflow macOS isi field `vnc_password`).
+4. Tunggu sekitar 5–10 menit sampai log menampilkan `CHROME REMOTE DESKTOP READY` (atau `MACOS REMOTE DESKTOP READY` untuk macOS).
 
 ### 3. Connect
 
@@ -259,7 +288,7 @@ virsh -c qemu:///system list --all
 
 ```
 rich-linux-crd/
-├── .github/workflows/       # cinnamon.yml, gnome.yml, xfce.yml (XFCE = beta)
+├── .github/workflows/       # cinnamon.yml, gnome.yml, xfce.yml (XFCE = beta), macos.yml
 ├── assets/
 │   ├── architecture.svg     # Diagram arsitektur di README
 │   ├── cinnamon-theme.zip   # Tema Catppuccin + ikon Zafiro (otomatis diinstal oleh workflow Cinnamon & XFCE)
@@ -267,6 +296,7 @@ rich-linux-crd/
 │   └── rich-linux-crd-logo.svg
 ├── opencode-setup/          # opencode-skills.md (panduan skill agent OpenCode + Context7)
 ├── scripts/                 # safe-upgrade.sh (version diff, --cleanup, rollback log, summary, reboot check)
+│   └── mac/setup-remote-access.sh  # macOS: Screen Sharing + noVNC + Cloudflare Quick Tunnel
 ├── README.md                # Dokumen utama (Inggris)
 ├── README.id.md             # File ini (Indonesia)
 ├── AGENTS.md                # Panduan melanjutkan proyek untuk agent/dev (Bahasa Indonesia)

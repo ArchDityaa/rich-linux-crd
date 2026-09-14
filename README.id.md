@@ -106,7 +106,7 @@ Workflow macOS (`macos.yml`) memakai tiga teknologi yang bekerja bersama:
 2. **noVNC** — klien VNC berbasis HTML5 di browser; disajikan lokal di port 6080
 3. **Cloudflare Quick Tunnel** — tunnel gratis yang membuat URL acak `*.trycloudflare.com` (tanpa akun atau API key)
 
-Setelah workflow selesai, log mencetak URL. Buka di browser, masukkan VNC password, dan Anda melihat desktop macOS Aqua lengkap dengan Chrome + VS Code + OpenCode yang sudah terpasang.
+Setelah workflow selesai, log mencetak URL. Buka di browser, masukkan VNC password, dan Anda melihat desktop macOS Aqua. Beta ini sengaja **tanpa tool tambahan** — tujuannya membuktikan GUI normal dulu. Runner image sudah punya Homebrew, jadi Anda bisa `brew install` apa pun dari Terminal dalam sesi (mis. `brew install --cask google-chrome`).
 
 Kelebihan:
 - **Nol secret**: tidak ada PIN CRD, tidak ada token ngrok, tidak ada akun Cloudflare/Google — cukup password yang Anda set saat menjalankan workflow

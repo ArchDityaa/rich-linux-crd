@@ -139,7 +139,7 @@ The macOS workflow (`macos.yml`) uses three technologies working together:
 2. **noVNC** — HTML5 VNC client that runs in a browser; served locally on port 6080
 3. **Cloudflare Quick Tunnel** — free tunnel that creates a random `*.trycloudflare.com` URL (no account or API key required)
 
-When the workflow finishes, the log prints a URL. Open it in any browser, enter the VNC password, and you see the macOS Aqua desktop with Chrome + VS Code + OpenCode pre-installed.
+When the workflow finishes, the log prints a URL. Open it in any browser, enter the VNC password, and you see the macOS Aqua desktop. This beta intentionally installs **no extra tools** — the goal is proving a normal GUI first. The runner image already ships Homebrew, so you can `brew install` anything from the Terminal inside the session (e.g. `brew install --cask google-chrome`).
 
 Advantages:
 - **Zero secrets**: no CRD PIN, no ngrok token, no Cloudflare account, no Google account — just a password you set at workflow start
@@ -182,7 +182,7 @@ flowchart LR
     A["You: fork repo, run workflow + paste CRD command"] --> B["GitHub Actions ubuntu-24.04"]
     A2["You: fork repo, run macOS workflow + set VNC password"] --> B2["GitHub Actions macos-15"]
     B --> C["Install: Cinnamon/GNOME, Chrome, OpenCode, CRD (+ VS Code on GNOME)"]
-    B2 --> C2["Install: Screen Sharing, noVNC, cloudflared, Chrome, VS Code, OpenCode"]
+    B2 --> C2["Install: Screen Sharing, noVNC, cloudflared"]
     C --> D["Register host, PIN 123456"]
     C2 --> D2["Quick Tunnel prints URL to log"]
     D --> E["X11 session without LightDM"]

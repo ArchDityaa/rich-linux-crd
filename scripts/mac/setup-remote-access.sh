@@ -101,13 +101,50 @@ sudo "$KICKSTART" \
   -clientopts -setvnclegacy -vnclegacy yes \
   -clientopts -setvncpw -vncpw "$VNC_PASSWORD" \
   -configure -access -on
-sleep 2
 
-# Self-check port VNC (5900) aktif.
-if lsof -nP -iTCP:5900 -sTCP:LISTEN >/dev/null 2>&1; then
-  echo -e "${C_GREEN}[OK] Screen Sharing aktif di port 5900.${C_NC}"
-else
-  echo -e "${C_YELLOW}[WARN] Port 5900 belum terdeteksi (mungkin butuh beberapa detik lagi).${C_NC}"
+# Fallback (macOS 14+ VMs): kickstart bisa mengkonfigurasi service tanpa
+# benar-benar memulai screensharingd. Launchctl memaksa daemon jalan.
+echo -e "${C_CYAN}[1/5] Memaksa screensharingd via launchctl (fallback untuk VM)...${C_NC}"
+sudo launchctl enable system/com.apple.screensharing 2>/dev/null || true
+sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || true
+sleep 3
+
+# Self-check port VNC (5900) — retry loop 10 × 3 detik.
+echo -e "${C_CYAN}[1/5] Menunggu port 5900 ...${C_NC}"
+MAX_VNC_ATTEMPTS=10
+VNC_ATTEMPT=0
+while [ "$VNC_ATTEMPT" -lt "$MAX_VNC_ATTEMPTS" ]; do
+  if lsof -nP -iTCP:5900 -sTCP:LISTEN >/dev/null 2>&1; then
+    echo -e "${C_GREEN}[OK] Screen Sharing aktif di port 5900.${C_NC}"
+    break
+  fi
+  VNC_ATTEMPT=$((VNC_ATTEMPT + 1))
+  echo -e "${C_YELLOW}  Attempt ${VNC_ATTEMPT}/${MAX_VNC_ATTEMPTS} — port 5900 belum aktif, tunggu 3s ...${C_NC}"
+  sleep 3
+done
+
+if [ "$VNC_ATTEMPT" -eq "$MAX_VNC_ATTEMPTS" ]; then
+  echo -e "${C_RED}[FAIL] Port 5900 tidak aktif setelah ${MAX_VNC_ATTEMPTS} percobaan.${C_NC}"
+  echo ""
+  echo "------------------------------------------------------------"
+  echo "  DIAGNOSTIC SCREENSHARING (detail untuk debugging)"
+  echo "------------------------------------------------------------"
+  echo "  launchctl status screensharingd:"
+  sudo launchctl list com.apple.screensharing 2>&1 || echo "    (not found)"
+  echo ""
+  echo "  Proses screensharingd:"
+  ps aux 2>/dev/null | grep -i screensharing | grep -v grep || echo "    (tidak jalan)"
+  echo ""
+  echo "  Semua port listening:"
+  sudo lsof -nP -iTCP -sTCP:LISTEN -P -n 2>/dev/null | head -30 || echo "    (tidak ada)"
+  echo ""
+  echo "  Kickstart log (last 10 lines):"
+  cat /var/log/kickstart.log 2>/dev/null | tail -n 10 || echo "    (tidak ada)"
+  echo ""
+  echo "  LoginWindow:"
+  ps aux 2>/dev/null | grep -i loginwindow | grep -v grep || echo "    (tidak ditemukan)"
+  echo "------------------------------------------------------------"
+  echo -e "${C_YELLOW}[WARN] Lanjut ke noVNC — port 5900 belum aktif.${C_NC}"
 fi
 
 # ============================================================

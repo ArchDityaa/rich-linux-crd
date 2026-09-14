@@ -98,35 +98,72 @@ ISO_SIZE=$(du -h "$ISO_FILE" | cut -f1)
 ok "Downloaded: ${ISO_SIZE}"
 
 # ============================================================
-# STEP 3: DETECT ISO ARCHITECTURE
+# STEP 3: DETECT HOST + ISO ARCH, PICK QEMU CONFIG
 # ============================================================
-step 3 "Detecting ISO architecture..."
+step 3 "Detecting host + ISO architecture..."
 ISO_URL_LOWER=$(echo "$ISO_URL" | tr '[:upper:]' '[:lower:]')
 ISO_BASENAME=$(basename "$ISO_URL" | tr '[:upper:]' '[:lower:]')
 
-if echo "${ISO_URL_LOWER} ${ISO_BASENAME}" | grep -qiE '(arm64|aarch64)'; then
-  QEMU_CPU="cortex-a72"
-  ARCH_LABEL="ARM64"
-  ok "ARM64 ISO detected — same-arch TCG (faster)."
-elif echo "${ISO_URL_LOWER} ${ISO_BASENAME}" | grep -qiE '(amd64|x86_64|x64)'; then
-  QEMU_CPU="qemu64"
-  ARCH_LABEL="x86_64"
-  warn "x86_64 ISO detected — TCG cross-arch emulation (slow)."
-  warn "Consider using an ARM64 ISO for better performance."
-else
-  QEMU_CPU="cortex-a72"
-  ARCH_LABEL="unknown (defaulting to ARM64)"
-  warn "Could not detect architecture from URL — defaulting to ARM64."
-fi
-info "CPU model: ${QEMU_CPU} (${ARCH_LABEL})"
+HOST_ARCH="x86_64"
+case "$(uname -m 2>/dev/null)" in
+  arm64|aarch64) HOST_ARCH="arm64" ;;
+esac
+info "Host architecture: ${HOST_ARCH}"
 
-# BINARY selection: aarch64 vs x86_64
-if [ "$QEMU_CPU" = "qemu64" ]; then
+if echo "${ISO_URL_LOWER} ${ISO_BASENAME}" | grep -qiE '(arm64|aarch64)'; then
+  GUEST_ARCH="arm64"
+  ARCH_LABEL="ARM64"
+elif echo "${ISO_URL_LOWER} ${ISO_BASENAME}" | grep -qiE '(amd64|x86_64|x64)'; then
+  GUEST_ARCH="x86_64"
+  ARCH_LABEL="x86_64"
+else
+  GUEST_ARCH="$HOST_ARCH"
+  ARCH_LABEL="unknown (defaulting to ${HOST_ARCH})"
+  warn "Could not detect ISO architecture — assuming ${HOST_ARCH}."
+fi
+ok "ISO architecture: ${ARCH_LABEL}"
+
+if [ "$GUEST_ARCH" != "$HOST_ARCH" ]; then
+  warn "Guest (${GUEST_ARCH}) != host (${HOST_ARCH}) — TCG lintas-arsitektur, akan sangat lambat."
+  warn "Gunakan ISO yang sesuai arsitektur runner: ${HOST_ARCH}."
+fi
+
+# QEMU binary + machine model by guest architecture
+if [ "$GUEST_ARCH" = "x86_64" ]; then
   QEMU_BIN="qemu-system-x86_64"
+  QEMU_MACHINE="q35"
+  GUEST_CPU_TEMPLATE="qemu64"
 else
   QEMU_BIN="qemu-system-aarch64"
+  QEMU_MACHINE="virt"
+  GUEST_CPU_TEMPLATE="cortex-a72"
 fi
-info "QEMU binary: ${QEMU_BIN}"
+
+# HVF detection (macOS Hypervisor.framework)
+HVF_OK=0
+if [ "$(sysctl -n kern.hv_support 2>/dev/null || echo 0)" = "1" ]; then
+  HVF_OK=1
+fi
+
+# Accelerator + CPU choice
+if [ "$HVF_OK" -eq 1 ] && [ "$GUEST_ARCH" = "$HOST_ARCH" ]; then
+  QEMU_MODE_LABEL="HVF (hardware-accelerated)"
+  ok "HVF tersedia — memakai akselerasi hardware."
+  QEMU_ACCEL=(-accel hvf)
+  QEMU_CPU=(host)
+elif [ "$GUEST_ARCH" = "$HOST_ARCH" ]; then
+  QEMU_MODE_LABEL="TCG same-arch"
+  ok "HVF tidak tersedia — memakai TCG same-arch."
+  QEMU_ACCEL=(-accel tcg)
+  QEMU_CPU=("$GUEST_CPU_TEMPLATE")
+else
+  QEMU_MODE_LABEL="TCG cross-arch"
+  warn "Cross-arch TCG — performa jauh lebih lambat."
+  QEMU_ACCEL=(-accel tcg)
+  QEMU_CPU=("$GUEST_CPU_TEMPLATE")
+fi
+info "QEMU: ${QEMU_BIN} | machine=${QEMU_MACHINE} | cpu=${QEMU_CPU[*]} | ${QEMU_MODE_LABEL}"
+
 command -v "$QEMU_BIN" >/dev/null 2>&1 || {
   fail "${QEMU_BIN} not found (brew install qemu)."
   exit 1
@@ -219,8 +256,9 @@ step 7 "Waiting for QEMU VNC port 5900..."
 step 8 "Starting QEMU VM..."
 
 QEMU_COMMON=(
-  -machine virt
-  -cpu "$QEMU_CPU"
+  -machine "$QEMU_MACHINE"
+  -cpu "${QEMU_CPU[@]}"
+  "${QEMU_ACCEL[@]}"
   -smp "$VM_CPUS"
   -m "$VM_MEMORY"
   -drive "file=${DISK_FILE},if=virtio,format=qcow2"

@@ -2,7 +2,7 @@
 
 [English](README.md) | **Bahasa Indonesia**
 
-> Ubuntu 24.04/26.04 di GitHub Actions + Chrome Remote Desktop. Pilih desktop **Cinnamon** yang ringan, **GNOME** yang stabil, atau **XFCE (Beta)** paling cepat — lalu remote dari mana saja dengan PIN. Plus desktop **macOS 14** yang di-stream ke browser via noVNC + Cloudflare Quick Tunnel, dan **Universal VM Runner** untuk boot ISO Linux apa pun di QEMU dengan akses browser.
+> Ubuntu 24.04/26.04 di GitHub Actions + Chrome Remote Desktop. Pilih desktop **Cinnamon** yang ringan, **GNOME** yang stabil, atau **XFCE (Beta)** paling cepat — lalu remote dari mana saja dengan PIN. Plus desktop **macOS 15** yang di-stream ke browser via noVNC + Cloudflare Quick Tunnel, dan **Universal VM Runner** untuk boot ISO Linux apa pun di QEMU dengan akses browser.
 
 <p align="center">
   <img src="assets/rich-linux-crd-banner.svg" alt="Banner RICH Linux CRD" width="820" />
@@ -19,7 +19,7 @@ Dokumen utama (lengkap, dalam Bahasa Inggris): [README.md](README.md). Halaman i
 - **Instalasi senyap** — hook needrestart dinonaktifkan, jadi tidak ada log `Scanning processes...` dan tidak ada restart layanan otomatis saat install/upgrade (mencegah sesi CRD putus).
 - **Tanpa snap** — `snapd` + deb transisi `thunderbird`/`firefox` di-purge dan di-hold, sehingga tidak ada hang "retry 30 menit ke snap store" saat install desktop. Tradeoff: `snap install` dan katalog Snap di GNOME Software tidak tersedia.
 - **XFCE Beta** — desktop ketiga, paling ringan & cepat (`xfce.yml`), memakai runner image **`ubuntu-26.04` public preview**. Label "beta" memang sengaja: image masih preview. KVM di image ini belum terverifikasi → warn-only.
-- **macOS 14** — desktop macOS asli (Apple Silicon arm64) via Screen Sharing bawaan + noVNC di browser + Cloudflare Quick Tunnel. Tanpa akun, tanpa API key, tanpa secret sama sekali.
+- **macOS 15** — desktop macOS asli (Apple Silicon arm64) via Screen Sharing bawaan + noVNC di browser + Cloudflare Quick Tunnel. Tanpa akun, tanpa API key, tanpa secret sama sekali.
 - **Universal VM Runner** — boot ISO Linux apa pun di dalam QEMU (di runner macOS), tampilan VM di-stream ke browser via noVNC. Setelah install selesai & reboot, VM otomatis boot dari disk (bukan installer lagi).
 
 ![Arsitektur: input pengguna mengalir melalui instalasi GitHub Actions dan registrasi CRD ke koneksi browser](assets/architecture.svg)
@@ -113,7 +113,7 @@ Kelebihan:
 - **Nol secret**: tidak ada PIN CRD, tidak ada token ngrok, tidak ada akun Cloudflare/Google — cukup password yang Anda set saat menjalankan workflow
 - **Bisa dari mana saja** dengan browser (browser mobile juga didukung)
 - **Desktop Aqua penuh**: WindowServer, menu aplikasi, dock, Finder — GUI macOS sungguhan
-- **Apple Silicon**: macOS 14 berjalan di runner arm64 GitHub-hosted (3 vCPU / 7 GB RAM)
+- **Apple Silicon**: macOS 15 berjalan di runner arm64 GitHub-hosted (3 vCPU / 7 GB RAM)
 - **Sleep dimatikan**: `pmset` + `caffeinate` menjaga sesi tetap hidup
 
 Batasan jujur:
@@ -126,17 +126,19 @@ Batasan jujur:
 
 ### Universal VM Runner — Boot ISO Linux Apa Pun di QEMU
 
-Mau menguji distro, menjalankan workload server, atau menginstal OS sendiri — tanpa menyentuh sesi host? **Universal VM Runner** (`vm-runner.yml`) mem-boot **ISO Linux live/install apa pun** di dalam QEMU pada runner macOS arm64, lalu menampilkan layar VM langsung ke browser via noVNC + Cloudflare Quick Tunnel.
+Mau menguji distro, menjalankan workload server, atau menginstal OS sendiri — tanpa menyentuh sesi host? **Universal VM Runner** (`vm-runner.yml`) mem-boot **ISO Linux live/install apa pun** di dalam QEMU pada runner macOS, lalu menampilkan layar VM langsung ke browser via noVNC + Cloudflare Quick Tunnel.
 
 Anda cukup menempelkan **URL ISO** di input workflow. Tidak ada secret, tidak ada akun, tidak ada konfigurasi Cloudflare.
 
+Berjalan di **`macos-15-intel`** (4 vCPU / **14 GB RAM**, gratis di repo publik) — runner macOS gratis dengan spesifikasi tertinggi. Arsitektur terdeteksi otomatis: ISO x86_64/amd64 disarankan (populer, teruji); script mendeteksi **HVF** (`sysctl kern.hv_support`) dan memakai akselerasi hardware kalau tersedia, fallback ke TCG.
+
 Cara kerjanya:
 
-1. **`iso_url`** — tempel tautan langsung ke `.iso` apa pun (Linux ARM64 disarankan; lihat batasan)
+1. **`iso_url`** — tempel tautan langsung ke `.iso` apa pun (x86_64/amd64 disarankan; lihat batasan)
 2. QEMU mem-boot ISO sebagai CD-ROM, display VNC di port 5900
 3. noVNC + Cloudflare Quick Tunnel mengalirkan VM ke browser
 4. Instal OS, lalu **reboot** dari dalam VM
-5. `-boot once=d` + `-no-reboot` membuat QEMU **otomatis beralih ke disk** — setelah installer reboot, VM boot ke OS terpasang, bukan installer lagi
+5. `-boot d` + `-no-reboot` membuat QEMU **otomatis beralih ke disk** — setelah installer reboot, VM boot ke OS terpasang, bukan installer lagi
 6. Workflow tetap hidup dari proses install → reboot → OS terpasang
 
 **Input** (workflow_dispatch):
@@ -144,8 +146,8 @@ Cara kerjanya:
 | Input | Wajib | Default | Deskripsi |
 |---|---|---|---|
 | `iso_url` | ya | — | URL langsung ke ISO installer/Live |
-| `vm_memory` | tidak | `2G` | RAM VM |
-| `vm_cpus` | tidak | `2` | vCPU VM (maks 3 di runner arm64) |
+| `vm_memory` | tidak | `8G` | RAM VM (runner Intel punya 14 GB) |
+| `vm_cpus` | tidak | `4` | vCPU VM (maks 4 di runner Intel) |
 | `disk_size` | tidak | `20G` | Ukuran disk virtual (qcow2 sparse) |
 | `keep_alive_minutes` | tidak | `360` | Lama sesi (maks 360) |
 
@@ -154,9 +156,10 @@ Kelebihan:
 - **Tetap hidup setelah reboot**: installer reboot ke OS terpasang secara otomatis; workflow tidak pernah mati
 - **Berbasis browser**: noVNC + Cloudflare Quick Tunnel yang sama seperti workflow macOS
 - **Port-forwarding SSH guest** bawaan: `hostfwd=tcp::22-:22`
+- **Akselerator otomatis**: memakai **HVF** jika runner mengeksposnya, selain itu TCG same-arch — dan memperingatkan keras untuk kombinasi lintas-arsitektur (lambat)
 
 Batasan jujur:
-- **Tidak ada HVF/KVM di runner macOS GitHub-hosted** (`actions/runner-images#13505` ditutup "not planned") — QEMU berjalan dengan **TCG software emulation**. ISO **Linux ARM64** pada runner ARM64 ini lumayan cepat; ISO **x86_64** lambat (emulasi lintas-arsitektur). Gunakan ISO ARM64 untuk pengalaman terbaik.
+- **Ketersediaan HVF/KVM bervariasi**: runner macOS GitHub-hosted umumnya tanpa nested virtualization (arm64 dipastikan tidak ada; Intel mungkin mengekspos `kern.hv_support=1`). Script mendeteksinya saat runtime — HVF kalau ada, selain itu **TCG** (software emulation). Menyamakan **arsitektur guest dengan runner** menjaga TCG tetap wajar; kombinasi lintas-arsitektur (mis. ISO ARM64 di runner Intel) sangat lambat.
 - **Disk runner 14 GB** — ISO besar >4 GB ditambah qcow2 besar bisa tidak muat. Pilih ISO ramping/netinstall, dan gunakan URL unduhan langsung (bukan halaman browser).
 - **Koneksi VNC putus sesaat** saat VM reboot (beberapa detik; noVNC auto-reconnect dengan `reconnect=true&reconnect_delay=3000`).
 - **Disk ephemeral** — qcow2 berada di runner dan hilang saat workflow berakhir. Belum ada persistensi.

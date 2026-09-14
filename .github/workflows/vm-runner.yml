@@ -4,21 +4,21 @@ on:
   workflow_dispatch:
     inputs:
       iso_url:
-        description: "URL installer ISO (Linux ARM64 direkomendasikan; x86_64 lambat)"
+        description: "URL installer ISO (x86_64/amd64 direkomendasikan untuk runner Intel; arm64 juga bisa)"
         required: true
         type: string
       vm_memory:
-        description: "Memori VM (contoh: 2G, 3G, 4G)"
+        description: "Memori VM (contoh: 2G, 8G; runner Intel punya 14 GB)"
         required: false
-        default: "2G"
+        default: "8G"
         type: string
       vm_cpus:
-        description: "CPU VM (maks 3 pada runner arm64)"
+        description: "CPU VM (maks 4 pada runner Intel)"
         required: false
-        default: "2"
+        default: "4"
         type: string
       disk_size:
-        description: "Ukuran disk virtual (contoh: 10G, 20G)"
+        description: "Ukuran disk virtual (contoh: 10G, 20G; hati-hati kapasitas runner 14 GB)"
         required: false
         default: "20G"
         type: string
@@ -30,7 +30,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15-intel
     timeout-minutes: 360
 
     steps:
@@ -54,7 +54,7 @@ jobs:
 
           arch
 
-          echo -e "${C_YELLOW}[INFO] Menginstall QEMU via Homebrew (bottle arm64)...${C_NC}"
+          echo -e "${C_YELLOW}[INFO] Menginstall QEMU via Homebrew...${C_NC}"
           brew install qemu 2>&1 | tail -5
 
           echo -e "${C_YELLOW}[INFO] Menginstall cloudflared via Homebrew...${C_NC}"
@@ -65,8 +65,12 @@ jobs:
           fi
 
           echo ""
-          echo -e "${C_GREEN}[OK] QEMU version:${C_NC}"
-          qemu-system-aarch64 --version 2>/dev/null | head -1 || true
+          echo -e "${C_GREEN}[OK] QEMU available:${C_NC}"
+          uname -m
+          command -v qemu-system-x86_64 && qemu-system-x86_64 --version 2>/dev/null | head -1 || true
+          command -v qemu-system-aarch64 && qemu-system-aarch64 --version 2>/dev/null | head -1 || true
+          echo -e "${C_GREEN}[OK] HVF support:${C_NC}"
+          sysctl -n kern.hv_support 2>/dev/null || echo "  (tidak tersedia — TCG saja)"
           echo -e "${C_GREEN}[OK] cloudflared version:${C_NC}"
           cloudflared --version 2>/dev/null | head -1 || true
 
@@ -157,7 +161,10 @@ jobs:
 
           echo ""
           echo -e "${C_CYAN}[4/8] QEMU / ISO / DISK${C_NC}"
-          qemu-system-aarch64 --version 2>/dev/null | head -2 || echo "  (qemu tidak terinstall)"
+          uname -m
+          command -v qemu-system-x86_64 && qemu-system-x86_64 --version 2>/dev/null | head -2 || echo "  (qemu-system-x86_64 tidak terinstall)"
+          command -v qemu-system-aarch64 && qemu-system-aarch64 --version 2>/dev/null | head -2 || true
+          sysctl -n kern.hv_support 2>/dev/null || echo "  (HVF tidak tersedia)"
           ls -lh "$GITHUB_WORKSPACE/installer.iso" 2>/dev/null || echo "  (installer.iso tidak ada)"
           ls -lh "$GITHUB_WORKSPACE/disk.qcow2" 2>/dev/null || echo "  (disk.qcow2 tidak ada)"
           du -h "$GITHUB_WORKSPACE/installer.iso" 2>/dev/null || true

@@ -24,6 +24,36 @@ Dokumen utama (lengkap, dalam Bahasa Inggris): [README.md](README.md). Halaman i
 
 ![Arsitektur: input pengguna mengalir melalui instalasi GitHub Actions dan registrasi CRD ke koneksi browser](assets/architecture.svg)
 
+<details>
+<summary><b>Daftar Isi</b></summary>
+
+- [Fitur Unggulan](#fitur-unggulan)
+  - [Setup Mudah — 4 Langkah, 5 Menit](#setup-mudah--4-langkah-5-menit)
+  - [Pengalaman Remote yang Mulus](#pengalaman-remote-yang-mulus)
+  - [Audio Streaming](#audio-streaming)
+  - [Tema Catppuccin & Ikon Zafiro (Cinnamon & XFCE)](#tema-catppuccin--ikon-zafiro-cinnamon--xfce)
+  - [Dev Tools Bawaan](#dev-tools-bawaan)
+  - [Virtualisasi KVM (Hardware-Accelerated VM)](#virtualisasi-kvm-hardware-accelerated-vm)
+  - [XFCE (Beta) — Desktop Paling Cepat](#xfce-beta--desktop-paling-cepat)
+  - [macOS — Screen Sharing Bawaan via Browser](#macos--screen-sharing-bawaan-via-browser)
+  - [Universal VM Runner — Boot ISO Linux Apa Pun di QEMU](#universal-vm-runner--boot-iso-linux-apa-pun-di-qemu)
+  - [Upgrade Anti-Putus](#upgrade-anti-putus)
+- [Mulai Cepat (5 menit)](#mulai-cepat-5-menit)
+- [Cinnamon vs GNOME](#cinnamon-vs-gnome)
+- [Troubleshooting: Error "Oh no! Something has gone wrong"](#troubleshooting-error-oh-no-something-has-gone-wrong)
+- [Penting: jangan `apt upgrade` polos di dalam sesi](#penting-jangan-apt-upgrade-polos-di-dalam-sesi)
+- [Struktur repo](#struktur-repo)
+- [Kustomisasi](#kustomisasi)
+- [Catatan](#catatan)
+- [Kebijakan Penggunaan & Disclaimer](#kebijakan-penggunaan--disclaimer)
+- [Lisensi](#lisensi)
+
+</details>
+
+![RICH Linux CRD — lima cara menuju desktop remote](assets/showcase.svg)
+
+<p align="center"><i>Lima varian, satu model — fork repo, jalankan workflow, konek dari browser mana pun.</i></p>
+
 ---
 
 ## Fitur Unggulan
@@ -332,12 +362,13 @@ virsh -c qemu:///system list --all
 
 ```
 rich-linux-crd/
-├── .github/workflows/       # cinnamon.yml, gnome.yml, xfce.yml (XFCE = beta), macos.yml, vm-runner.yml
+├── .github/workflows/       # cinnamon.yml, gnome.yml, xfce.yml (XFCE = beta), macos.yml, vm-runner.yml, stable.yml (legacy)
 ├── assets/
 │   ├── architecture.svg     # Diagram arsitektur di README
 │   ├── cinnamon-theme.zip   # Tema Catppuccin + ikon Zafiro (otomatis diinstal oleh workflow Cinnamon & XFCE)
 │   ├── rich-linux-crd-banner.svg
-│   └── rich-linux-crd-logo.svg
+│   ├── rich-linux-crd-logo.svg
+│   └── showcase.svg         # Panel showcase desktop remote di README
 ├── opencode-setup/          # opencode-skills.md (panduan skill agent OpenCode + Context7)
 ├── scripts/                 # safe-upgrade.sh (version diff, --cleanup, rollback log, summary, reboot check)
 │   ├── mac/
@@ -346,7 +377,6 @@ rich-linux-crd/
 │       └── setup-vm.sh             # Universal VM: download ISO, qcow2 disk, boot loop QEMU, noVNC, tunnel
 ├── README.md                # Dokumen utama (Inggris)
 ├── README.id.md             # File ini (Indonesia)
-├── AGENTS.md                # Panduan melanjutkan proyek untuk agent/dev (Bahasa Indonesia)
 ├── LICENSE
 └── .gitignore
 ```

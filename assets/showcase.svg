@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 380" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-label="RICH Linux CRD — five ways to a remote desktop showcase">
+  <title>RICH Linux CRD — Remote Desktop Showcase</title>
+  <desc>Five color-coded cards: Cinnamon (full), GNOME (stable), XFCE (beta), macOS 15 (zero secrets), and VM Runner (universal) — all reachable from a browser.</desc>
+
+  <style>
+    .cardback { fill: #ffffff; stroke: #d0d7de; }
+    .card     { fill: #ffffff; stroke: #d0d7de; }
+    .foot     { fill: #f6f8fa; stroke: #d0d7de; }
+    .t-title  { fill: #1f2328; }
+    .t-sub    { fill: #57606a; }
+    .name     { fill: #1f2328; }
+    .t-bo     { fill: #24292f; }
+    .t-mu     { fill: #57606a; }
+    .div      { stroke: #d0d7de; }
+    .foot-t   { fill: #57606a; }
+
+    .dot-c  { fill: #E95420; } .band-c  { fill: #fff1e5; } .t-c  { fill: #E95420; } .ring-c  { stroke: #E95420; }
+    .dot-n  { fill: #0969da; } .band-n  { fill: #ddf4ff; } .t-n  { fill: #0969da; } .ring-n  { stroke: #0969da; }
+    .dot-x  { fill: #1a7f37; } .band-x  { fill: #dafbe1; } .t-x  { fill: #1a7f37; } .ring-x  { stroke: #1a7f37; }
+    .dot-m  { fill: #bf3989; } .band-m  { fill: #ffd7f4; } .t-m  { fill: #bf3989; } .ring-m  { stroke: #bf3989; }
+    .dot-v  { fill: #8250df; } .band-v  { fill: #fbefff; } .t-v  { fill: #8250df; } .ring-v  { stroke: #8250df; }
+
+    @media (prefers-color-scheme: dark) {
+      .cardback { fill: #161b22; stroke: #30363d; }
+      .card     { fill: #161b22; stroke: #30363d; }
+      .foot     { fill: #0d1117; stroke: #30363d; }
+      .t-title  { fill: #e6edf3; }
+      .t-sub    { fill: #9198a1; }
+      .name     { fill: #e6edf3; }
+      .t-bo     { fill: #e6edf3; }
+      .t-mu     { fill: #9198a1; }
+      .div      { stroke: #30363d; }
+      .foot-t   { fill: #9198a1; }
+
+      .dot-c  { fill: #f0883e; } .band-c  { fill: #441a04; } .t-c  { fill: #f0883e; } .ring-c  { stroke: #f0883e; }
+      .dot-n  { fill: #4493f8; } .band-n  { fill: #0f2a43; } .t-n  { fill: #4493f8; } .ring-n  { stroke: #4493f8; }
+      .dot-x  { fill: #3fb950; } .band-x  { fill: #0d3117; } .t-x  { fill: #3fb950; } .ring-x  { stroke: #3fb950; }
+      .dot-m  { fill: #db61a2; } .band-m  { fill: #3a1c33; } .t-m  { fill: #db61a2; } .ring-m  { stroke: #db61a2; }
+      .dot-v  { fill: #9e77f3; } .band-v  { fill: #2d1a49; } .t-v  { fill: #9e77f3; } .ring-v  { stroke: #9e77f3; }
+    }
+  </style>
+
+  <!-- Backdrop card -->
+  <rect x="16" y="12" width="1168" height="350" rx="16" class="cardback" stroke-width="1.5"/>
+
+  <!-- Title -->
+  <text x="42" y="54" font-size="22" font-weight="700" class="t-title">RICH Linux CRD — Remote Desktop Showcase</text>
+  <text x="42" y="78" font-size="13" class="t-sub">Five flavors, one model: fork the repo, run the workflow, connect from any browser. No SSH, no port forwarding.</text>
+
+  <!-- ============ Card template helpers (per-card data) ============ -->
+
+  <!-- CARD 1: Cinnamon -->
+  <g>
+    <rect x="30" y="110" width="216" height="188" rx="14" class="card" stroke-width="1.5"/>
+    <rect x="30" y="110" width="216" height="52" rx="10" class="band-c"/>
+    <rect x="30" y="122" width="216" height="40" class="band-c"/>
+    <circle cx="48" cy="136" r="6" class="dot-c"/>
+    <circle cx="48" cy="136" r="10" fill="none" class="ring-c" opacity="0.35" stroke-width="1.5"/>
+    <text x="64" y="142" font-size="16" font-weight="700" class="name">Cinnamon</text>
+    <rect x="82" y="178" width="64" height="22" rx="11" class="band-c"/>
+    <text x="114" y="193" font-size="11" font-weight="700" text-anchor="middle" class="t-c">FULL</text>
+    <line x1="44" y1="212" x2="232" y2="212" class="div" stroke-width="1.5"/>
+    <text x="48" y="238" font-size="13" font-weight="700" class="t-c" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">~ 1 GB install</text>
+    <text x="48" y="262" font-size="13.5" class="t-bo">Cinnamon + CRD</text>
+    <text x="48" y="284" font-size="12.5" class="t-mu">Catppuccin theme</text>
+  </g>
+
+  <!-- CARD 2: GNOME -->
+  <g>
+    <rect x="261" y="110" width="216" height="188" rx="14" class="card" stroke-width="1.5"/>
+    <rect x="261" y="110" width="216" height="52" rx="10" class="band-n"/>
+    <rect x="261" y="122" width="216" height="40" class="band-n"/>
+    <circle cx="279" cy="136" r="6" class="dot-n"/>
+    <circle cx="279" cy="136" r="10" fill="none" class="ring-n" opacity="0.35" stroke-width="1.5"/>
+    <text x="295" y="142" font-size="16" font-weight="700" class="name">GNOME</text>
+    <rect x="326" y="178" width="86" height="22" rx="11" class="band-n"/>
+    <text x="369" y="193" font-size="11" font-weight="700" text-anchor="middle" class="t-n">STABLE</text>
+    <line x1="275" y1="212" x2="463" y2="212" class="div" stroke-width="1.5"/>
+    <text x="279" y="238" font-size="13" font-weight="700" class="t-n" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">~ 2 GB install</text>
+    <text x="279" y="262" font-size="13.5" class="t-bo">GNOME + CRD</text>
+    <text x="279" y="284" font-size="12.5" class="t-mu">VS Code included</text>
+  </g>
+
+  <!-- CARD 3: XFCE -->
+  <g>
+    <rect x="492" y="110" width="216" height="188" rx="14" class="card" stroke-width="1.5"/>
+    <rect x="492" y="110" width="216" height="52" rx="10" class="band-x"/>
+    <rect x="492" y="122" width="216" height="40" class="band-x"/>
+    <circle cx="510" cy="136" r="6" class="dot-x"/>
+    <circle cx="510" cy="136" r="10" fill="none" class="ring-x" opacity="0.35" stroke-width="1.5"/>
+    <text x="526" y="142" font-size="16" font-weight="700" class="name">XFCE</text>
+    <rect x="568" y="178" width="64" height="22" rx="11" class="band-x"/>
+    <text x="600" y="193" font-size="11" font-weight="700" text-anchor="middle" class="t-x">BETA</text>
+    <line x1="506" y1="212" x2="694" y2="212" class="div" stroke-width="1.5"/>
+    <text x="510" y="238" font-size="13" font-weight="700" class="t-x" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">lightest + fastest</text>
+    <text x="510" y="262" font-size="13.5" class="t-bo">XFCE + CRD</text>
+    <text x="510" y="284" font-size="12.5" class="t-mu">ubuntu-26.04 preview</text>
+  </g>
+
+  <!-- CARD 4: macOS 15 -->
+  <g>
+    <rect x="723" y="110" width="216" height="188" rx="14" class="card" stroke-width="1.5"/>
+    <rect x="723" y="110" width="216" height="52" rx="10" class="band-m"/>
+    <rect x="723" y="122" width="216" height="40" class="band-m"/>
+    <circle cx="741" cy="136" r="6" class="dot-m"/>
+    <circle cx="741" cy="136" r="10" fill="none" class="ring-m" opacity="0.35" stroke-width="1.5"/>
+    <text x="757" y="142" font-size="16" font-weight="700" class="name">macOS 15</text>
+    <rect x="768" y="178" width="126" height="22" rx="11" class="band-m"/>
+    <text x="831" y="193" font-size="11" font-weight="700" text-anchor="middle" class="t-m">ZERO SECRETS</text>
+    <line x1="737" y1="212" x2="925" y2="212" class="div" stroke-width="1.5"/>
+    <text x="741" y="238" font-size="13" font-weight="700" class="t-m" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">zero secrets</text>
+    <text x="741" y="262" font-size="13.5" class="t-bo">Screen Sharing + noVNC</text>
+    <text x="741" y="284" font-size="12.5" class="t-mu">Apple Silicon + Cloudflare</text>
+  </g>
+
+  <!-- CARD 5: VM Runner -->
+  <g>
+    <rect x="954" y="110" width="216" height="188" rx="14" class="card" stroke-width="1.5"/>
+    <rect x="954" y="110" width="216" height="52" rx="10" class="band-v"/>
+    <rect x="954" y="122" width="216" height="40" class="band-v"/>
+    <circle cx="972" cy="136" r="6" class="dot-v"/>
+    <circle cx="972" cy="136" r="10" fill="none" class="ring-v" opacity="0.35" stroke-width="1.5"/>
+    <text x="988" y="142" font-size="16" font-weight="700" class="name">VM Runner</text>
+    <rect x="1010" y="178" width="104" height="22" rx="11" class="band-v"/>
+    <text x="1062" y="193" font-size="11" font-weight="700" text-anchor="middle" class="t-v">UNIVERSAL</text>
+    <line x1="968" y1="212" x2="1156" y2="212" class="div" stroke-width="1.5"/>
+    <text x="972" y="238" font-size="13" font-weight="700" class="t-v" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">any Linux ISO</text>
+    <text x="972" y="262" font-size="13.5" class="t-bo">QEMU + noVNC</text>
+    <text x="972" y="284" font-size="12.5" class="t-mu">macos-15-intel · 14 GB</text>
+  </g>
+
+  <!-- Footer callout -->
+  <rect x="30" y="318" width="1140" height="44" rx="10" class="foot" stroke-width="1"/>
+  <text x="600" y="345" font-size="12.5" text-anchor="middle" class="foot-t">Same model for all five: fork the repo → run the workflow → connect from any browser. No SSH, no port forwarding, no secrets.</text>
+</svg>

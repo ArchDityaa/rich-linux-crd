@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-label="RICH Linux CRD banner">
   <title>RICH Linux CRD — Banner</title>
-  <desc>Icon plus the RICH Linux CRD wordmark and tagline for Ubuntu 24.04 with Chrome Remote Desktop (Cinnamon or GNOME).</desc>
+  <desc>Icon plus the RICH Linux CRD wordmark and tagline for remote desktops on GitHub Actions — Cinnamon, GNOME, XFCE, macOS 15 and the Universal VM Runner.</desc>
 
   <style>
     .bg    { fill: #ffffff; stroke: #d0d7de; }
@@ -71,8 +71,8 @@
 
   <!-- Wordmark -->
   <text x="420" y="200" font-size="58" font-weight="800" class="t-title">RICH LINUX <tspan class="blue">CRD</tspan></text>
-  <text x="424" y="244" font-size="26" class="t-sub">Ubuntu 24.04 · Chrome Remote Desktop · Cinnamon or GNOME</text>
-  <text x="424" y="286" font-size="20" class="t-sub">Headless X11 on GitHub Actions — connect from anywhere with a PIN.</text>
+  <text x="424" y="244" font-size="26" class="t-sub">Linux · macOS · any ISO — five remote desktops</text>
+  <text x="424" y="286" font-size="20" class="t-sub">GitHub Actions + Chrome Remote Desktop / noVNC — connect from any browser.</text>
 
   <!-- Tag pill -->
   <g>

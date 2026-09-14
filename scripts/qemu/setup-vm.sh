@@ -7,7 +7,7 @@
 #   3. Buat disk image qcow2 (sparse allocation)
 #   4. Setup noVNC + websockify (port 6080 → VNC TCP 5900)
 #   5. Jalankan Cloudflare Quick Tunnel → URL publik
-#   6. Jalankan QEMU VM dengan -boot once=d (installer → installed OS)
+#   6. Jalankan QEMU VM dengan -boot order=cd (disk dulu, fallback ISO — self-healing)
 #
 # Cara pakai (dari GitHub Actions):
 #   ISO_URL=https://... VM_MEMORY=2G VM_CPUS=2 DISK_SIZE=20G \
@@ -17,8 +17,8 @@
 #
 # Catatan:
 #   - QEMU VNC server di port 5900 (TCP), noVNC bridge ke WebSocket 6080.
-#   - -no-reboot: QEMU exit saat guest reboot → restart tanpa ISO → boot dari disk.
-#   - -boot once=d: UEFI firmware boot dari CD-ROM sekali, lalu revert ke disk.
+#   - -no-reboot: QEMU exit saat guest reboot → loop restart perintah yang sama (self-healing).
+#   - -boot order=cd: SeaBIOS/EFI coba hard disk dulu, fallback ke ISO selagi disk belum bootable.
 #   - Quick Tunnel (TryCloudflare) gratis, URL acak, ephemeral.
 
 set -euo pipefail
@@ -296,12 +296,19 @@ QEMU_COMMON=(
   -serial "file:${SERIAL_LOG}"
 )
 
-PHASE="installer"
 RESTART_COUNT=0
 KEEP_ALIVE_SECONDS=$((KEEP_ALIVE_MINUTES * 60))
 START_TIME=$(date +%s)
-info "SSH guest port-forward: host 127.0.0.1:8022 -> guest :22 (port 22 host dipakai SSHD runner)"
+SHORT_EXITS=0
 
+info "SSH guest port-forward: host 127.0.0.1:8022 -> guest :22 (port 22 host dipakai SSHD runner)"
+info "Boot order: hard disk dulu, fallback ke ISO selagi disk belum bootable (self-healing)."
+
+# Unified self-healing boot:
+#   - Setiap restart menjalankan perintah QEMU yang SAMA: -cdrom + -boot order=cd.
+#   - SeaBIOS/EFI mencoba hard disk (c) dulu; kalau belum bootable, fallback ke ISO (d).
+#   - Tidak ada asumsi "reboot = installer selesai"; BIOS yang memutuskan mau boot apa.
+#   - -no-reboot: guest reboot/poweroff -> QEMU exit -> loop restart perintah yang sama.
 while true; do
   ELAPSED=$(( $(date +%s) - START_TIME ))
   REMAIN=$(( KEEP_ALIVE_SECONDS - ELAPSED ))
@@ -312,41 +319,31 @@ while true; do
   info "Session remaining: ~$((REMAIN / 60)) min"
 
   QEMU_START=$(date +%s)
-
-  if [ "$PHASE" = "installer" ]; then
-    echo -e "  ${C_CYAN}[PHASE 1] Installer — booting from ISO...${C_NC}"
-    set +e
-    "$QEMU_BIN" "${QEMU_COMMON[@]}" -no-reboot -cdrom "$ISO_FILE" -boot d
-    QEMU_EXIT=$?
-    set -e
-    echo -e "  ${C_YELLOW}[INFO] QEMU exited (rc=${QEMU_EXIT}) after installer phase.${C_NC}"
-    RUN_PHASE="installer"
-  else
-    echo -e "  ${C_CYAN}[PHASE 2] Installed OS — booting from disk...${C_NC}"
-    set +e
-    "$QEMU_BIN" "${QEMU_COMMON[@]}" -no-reboot
-    QEMU_EXIT=$?
-    set -e
-    echo -e "  ${C_YELLOW}[INFO] QEMU exited (rc=${QEMU_EXIT}).${C_NC}"
-    RUN_PHASE="installed"
-  fi
-
+  echo -e "  ${C_CYAN}[BOOT #${RESTART_COUNT}] disk -> fallback ISO${C_NC}"
+  set +e
+  "$QEMU_BIN" "${QEMU_COMMON[@]}" -no-reboot -cdrom "$ISO_FILE" -boot order=cd
+  QEMU_EXIT=$?
+  set -e
   QEMU_END=$(date +%s)
   QEMU_DURATION=$((QEMU_END - QEMU_START))
+  echo -e "  ${C_YELLOW}[INFO] QEMU exited (rc=${QEMU_EXIT}) after ${QEMU_DURATION}s.${C_NC}"
 
-  # Short run in the installed phase = crash, not a user-triggered reboot.
-  if [ "$RUN_PHASE" = "installed" ] && [ "$QEMU_DURATION" -lt 30 ]; then
-    fail "QEMU exited after only ${QEMU_DURATION}s in installed phase — likely crash. Stopping."
-    break
-  fi
-  # Short run in the installer phase is also abnormal (no OS installs in <30s).
-  if [ "$RUN_PHASE" = "installer" ] && [ "$QEMU_DURATION" -lt 30 ]; then
-    warn "Installer phase exited after only ${QEMU_DURATION}s (unusually fast) — continuing anyway."
+  # Short exit = kemungkinan crash, tapi jangan berhenti: disk/ISO masih jadi fallback.
+  # Session tetap hidup sampai keepalive habis.
+  if [ "$QEMU_DURATION" -lt 30 ]; then
+    SHORT_EXITS=$((SHORT_EXITS + 1))
+    warn "QEMU berhenti cepat (${QEMU_DURATION}s, #${SHORT_EXITS} berturut-turut) — kemungkinan crash."
+    if [ "$SHORT_EXITS" -ge 3 ]; then
+      warn "Banyak short-exit. Cek isi VM via VNC: jika 'no bootable device' muncul, boot akan otomatis"
+      warn "kembali ke ISO karena -boot order=cd. Kalau disk rusak permanen, re-run workflow saja."
+    fi
+    sleep 5
+  else
+    SHORT_EXITS=0
   fi
 
   RESTART_COUNT=$((RESTART_COUNT + 1))
   info "Reboot #${RESTART_COUNT} — restarting QEMU (back online in a few seconds)..."
-  PHASE="installed"
   sleep 2
 done
 

@@ -20,7 +20,7 @@ Dokumen utama (lengkap, dalam Bahasa Inggris): [README.md](README.md). Halaman i
 - **Tanpa snap** — `snapd` + deb transisi `thunderbird`/`firefox` di-purge dan di-hold, sehingga tidak ada hang "retry 30 menit ke snap store" saat install desktop. Tradeoff: `snap install` dan katalog Snap di GNOME Software tidak tersedia.
 - **XFCE Beta** — desktop ketiga, paling ringan & cepat (`xfce.yml`), memakai runner image **`ubuntu-26.04` public preview**. Label "beta" memang sengaja: image masih preview. KVM di image ini belum terverifikasi → warn-only.
 - **macOS 15** — desktop macOS asli (Apple Silicon arm64) via Screen Sharing bawaan + noVNC di browser + Cloudflare Quick Tunnel. Tanpa akun, tanpa API key, tanpa secret sama sekali.
-- **Universal VM Runner** — boot ISO Linux apa pun di dalam QEMU (di runner macOS), tampilan VM di-stream ke browser via noVNC. Setelah install selesai & reboot, VM otomatis boot dari disk (bukan installer lagi).
+- **Universal VM Runner** — boot ISO Linux apa pun di dalam QEMU (di runner macOS), tampilan VM di-stream ke browser via noVNC. Begitu disk bootable, VM otomatis boot ke disk terpasang — dengan fallback ISO otomatis.
 
 ![Arsitektur: input pengguna mengalir melalui instalasi GitHub Actions dan registrasi CRD ke koneksi browser](assets/architecture.svg)
 
@@ -138,7 +138,7 @@ Cara kerjanya:
 2. QEMU mem-boot ISO sebagai CD-ROM, display VNC di port 5900
 3. noVNC + Cloudflare Quick Tunnel mengalirkan VM ke browser
 4. Instal OS, lalu **reboot** dari dalam VM
-5. `-boot d` + `-no-reboot` membuat QEMU **otomatis beralih ke disk** — setelah installer reboot, VM boot ke OS terpasang, bukan installer lagi
+5. **Boot self-healing**: setiap restart menjalankan perintah QEMU yang sama dengan `-boot order=cd` — firmware mencoba hard disk dulu, fallback ke ISO selagi disk belum bootable. VM boot ke OS terpasang begitu disk siap, dan kembali ke installer jika reboot terjadi sebelum install selesai (tidak ada jebakan "no bootable device")
 6. Workflow tetap hidup dari proses install → reboot → OS terpasang
 
 **Input** (workflow_dispatch):
@@ -153,7 +153,7 @@ Cara kerjanya:
 
 Kelebihan:
 - **Universal**: ISO bootable apa pun — Ubuntu Server, Debian netinstall, Alpine, Fedora, Arch, dsb.
-- **Tetap hidup setelah reboot**: installer reboot ke OS terpasang secara otomatis; workflow tidak pernah mati
+- **Tetap hidup setelah reboot**: firmware memilih disk begitu bootable, dan kembali ke ISO jika belum — tanpa asumsi bahwa reboot berarti installer selesai
 - **Berbasis browser**: noVNC + Cloudflare Quick Tunnel yang sama seperti workflow macOS
 - **Port-forwarding SSH guest** bawaan: `ssh user@127.0.0.1 -p 8022` (host:8022 → guest:22; port 22 host dipakai SSHD runner)
 - **Akselerator otomatis**: memakai **HVF** jika runner mengeksposnya, selain itu TCG same-arch — dan memperingatkan keras untuk kombinasi lintas-arsitektur (lambat)
@@ -162,6 +162,7 @@ Batasan jujur:
 - **Ketersediaan HVF/KVM bervariasi**: runner macOS GitHub-hosted umumnya tanpa nested virtualization (arm64 dipastikan tidak ada; Intel mungkin mengekspos `kern.hv_support=1`). Script mendeteksinya saat runtime — HVF kalau ada, selain itu **TCG** (software emulation). Menyamakan **arsitektur guest dengan runner** menjaga TCG tetap wajar; kombinasi lintas-arsitektur (mis. ISO ARM64 di runner Intel) sangat lambat.
 - **Disk runner 14 GB** — ISO besar >4 GB ditambah qcow2 besar bisa tidak muat. Pilih ISO ramping/netinstall, dan gunakan URL unduhan langsung (bukan halaman browser).
 - **Koneksi VNC putus sesaat** saat VM reboot (beberapa detik; noVNC auto-reconnect dengan `reconnect=true&reconnect_delay=3000`).
+- **ISO tetap terpasang** selama OS terpasang berjalan — tidak berbahaya (disk di-boot lebih dulu), tapi prompt "remove installation media" Debian saat akhir installer hanya bersifat informatif; setelah Enter tetap reboot ke OS terpasang.
 - **Disk ephemeral** — qcow2 berada di runner dan hilang saat workflow berakhir. Belum ada persistensi.
 - **ISO tamu macOS belum didukung** di versi pertama ini (tamu macOS butuh konfigurasi bootloader OpenCore).
 

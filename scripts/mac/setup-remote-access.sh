@@ -260,7 +260,7 @@ if [ -z "$TUNNEL_URL" ]; then
 fi
 
 # Simpan URL ke file agar step Verify/Keep Alive di workflow bisa membacanya.
-echo "$TUNNEL_URL" > /tmp/cf-tunnel-url.txt
+echo "${TUNNEL_URL}/vnc.html?autoconnect=true&resize=scale" > /tmp/cf-tunnel-url.txt
 chmod 644 /tmp/cf-tunnel-url.txt
 
 # ============================================================
@@ -275,6 +275,7 @@ echo -e "      ${C_CYAN}${TUNNEL_URL}/vnc.html${C_NC}"
 echo -e "      [INFO] Connection type     : noVNC (web) + Cloudflare Quick Tunnel"
 echo -e "      [INFO] User                : runner"
 echo -e "      [INFO] VNC Password        : $VNC_PASSWORD"
+echo -e "      [INFO] NoVNC               : masukkan password di atas (Username tidak perlu diisi)"
 echo -e "      [INFO] Direct VNC          : vnc://localhost:5900 (local only)"
 echo "=============================================================="
 

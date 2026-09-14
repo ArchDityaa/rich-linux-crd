@@ -104,27 +104,48 @@ sudo "$KICKSTART" \
 
 # Fallback (macOS 14+ VMs): kickstart bisa mengkonfigurasi service tanpa
 # benar-benar memulai screensharingd. Launchctl memaksa daemon jalan.
+# Catatan: di macOS 15 listener 5900 adalah socket activation oleh launchd
+# (PID 1) — screensharingd baru di-spawn saat ada koneksi pertama. Jadi
+# `lsof` non-root bisa gagal walau port sebenarnya aktif; yang benar adalah
+# tes koneksi nyata dengan `nc` (sekaligus membangunkan daemon).
 echo -e "${C_CYAN}[1/5] Memaksa screensharingd via launchctl (fallback untuk VM)...${C_NC}"
 sudo launchctl enable system/com.apple.screensharing 2>/dev/null || true
 sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || true
 sleep 3
 
-# Self-check port VNC (5900) — retry loop 10 × 3 detik.
-echo -e "${C_CYAN}[1/5] Menunggu port 5900 ...${C_NC}"
+# Self-check VNC (5900) — TCP probe nyata + handshake protokol RFB, 10 × 3 detik.
+echo -e "${C_CYAN}[1/5] Menunggu port 5900 (TCP probe) ...${C_NC}"
 MAX_VNC_ATTEMPTS=10
 VNC_ATTEMPT=0
+VNC_TCP_OK=0
+VNC_RFB_OK=0
 while [ "$VNC_ATTEMPT" -lt "$MAX_VNC_ATTEMPTS" ]; do
-  if lsof -nP -iTCP:5900 -sTCP:LISTEN >/dev/null 2>&1; then
-    echo -e "${C_GREEN}[OK] Screen Sharing aktif di port 5900.${C_NC}"
+  if nc -z -G 2 127.0.0.1 5900 >/dev/null 2>&1; then
+    echo -e "${C_GREEN}[OK] TCP 5900 terbuka (koneksi diterima).${C_NC}"
+    VNC_TCP_OK=1
     break
   fi
   VNC_ATTEMPT=$((VNC_ATTEMPT + 1))
-  echo -e "${C_YELLOW}  Attempt ${VNC_ATTEMPT}/${MAX_VNC_ATTEMPTS} — port 5900 belum aktif, tunggu 3s ...${C_NC}"
+  echo -e "${C_YELLOW}  Attempt ${VNC_ATTEMPT}/${MAX_VNC_ATTEMPTS} — 5900 belum menerima koneksi, tunggu 3s ...${C_NC}"
   sleep 3
 done
 
-if [ "$VNC_ATTEMPT" -eq "$MAX_VNC_ATTEMPTS" ]; then
-  echo -e "${C_RED}[FAIL] Port 5900 tidak aktif setelah ${MAX_VNC_ATTEMPTS} percobaan.${C_NC}"
+# Handshake RFB: kirim banner VNC, harapkan jawaban "RFB 003.008".
+# Ini membuktikan screensharingd BENAR-BENAR spawn & melayani protokol,
+# bukan sekadar port terbuka (membedakan "normal" vs "VNC diblokir di VM").
+RFB_BANNER=""
+if [ "$VNC_TCP_OK" -eq 1 ]; then
+  RFB_BANNER=$(printf 'RFB 003.008\n' | nc -G 3 127.0.0.1 5900 2>/dev/null | head -n 1 || true)
+  if [ -n "$RFB_BANNER" ]; then
+    echo -e "${C_GREEN}[OK] VNC handshake RFB: '${RFB_BANNER}' — screensharingd aktif.${C_NC}"
+    VNC_RFB_OK=1
+  else
+    echo -e "${C_YELLOW}[WARN] Port terbuka tapi tidak ada banner RFB. Kemungkinan VNC diblokir di VM (lihat step Verify).${C_NC}"
+  fi
+fi
+
+if [ "$VNC_TCP_OK" -eq 0 ] || [ "$VNC_RFB_OK" -eq 0 ]; then
+  echo -e "${C_RED}[WARN] VNC belum sepenuhnya siap (TCP=${VNC_TCP_OK}, RFB=${VNC_RFB_OK}).${C_NC}"
   echo ""
   echo "------------------------------------------------------------"
   echo "  DIAGNOSTIC SCREENSHARING (detail untuk debugging)"
@@ -144,7 +165,7 @@ if [ "$VNC_ATTEMPT" -eq "$MAX_VNC_ATTEMPTS" ]; then
   echo "  LoginWindow:"
   ps aux 2>/dev/null | grep -i loginwindow | grep -v grep || echo "    (tidak ditemukan)"
   echo "------------------------------------------------------------"
-  echo -e "${C_YELLOW}[WARN] Lanjut ke noVNC — port 5900 belum aktif.${C_NC}"
+  echo -e "${C_YELLOW}[WARN] Lanjut ke noVNC — VNC belum full-ready.${C_NC}"
 fi
 
 # ============================================================

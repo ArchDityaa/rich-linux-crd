@@ -2,7 +2,7 @@
 
 [English](README.md) | **Bahasa Indonesia**
 
-> Ubuntu 24.04/26.04 di GitHub Actions + Chrome Remote Desktop. Pilih desktop **Cinnamon** yang ringan, **GNOME** yang stabil, atau **XFCE (Beta)** paling cepat — lalu remote dari mana saja dengan PIN. Plus desktop **macOS 15** yang di-stream ke browser via noVNC + Cloudflare Quick Tunnel.
+> Ubuntu 24.04/26.04 di GitHub Actions + Chrome Remote Desktop. Pilih desktop **Cinnamon** yang ringan, **GNOME** yang stabil, atau **XFCE (Beta)** paling cepat — lalu remote dari mana saja dengan PIN. Plus desktop **macOS 14** yang di-stream ke browser via noVNC + Cloudflare Quick Tunnel.
 
 <p align="center">
   <img src="assets/rich-linux-crd-banner.svg" alt="Banner RICH Linux CRD" width="820" />
@@ -19,7 +19,7 @@ Dokumen utama (lengkap, dalam Bahasa Inggris): [README.md](README.md). Halaman i
 - **Instalasi senyap** — hook needrestart dinonaktifkan, jadi tidak ada log `Scanning processes...` dan tidak ada restart layanan otomatis saat install/upgrade (mencegah sesi CRD putus).
 - **Tanpa snap** — `snapd` + deb transisi `thunderbird`/`firefox` di-purge dan di-hold, sehingga tidak ada hang "retry 30 menit ke snap store" saat install desktop. Tradeoff: `snap install` dan katalog Snap di GNOME Software tidak tersedia.
 - **XFCE Beta** — desktop ketiga, paling ringan & cepat (`xfce.yml`), memakai runner image **`ubuntu-26.04` public preview**. Label "beta" memang sengaja: image masih preview. KVM di image ini belum terverifikasi → warn-only.
-- **macOS 15** — desktop macOS asli (Apple Silicon arm64) via Screen Sharing bawaan + noVNC di browser + Cloudflare Quick Tunnel. Tanpa akun, tanpa API key, tanpa secret sama sekali.
+- **macOS 14** — desktop macOS asli (Apple Silicon arm64) via Screen Sharing bawaan + noVNC di browser + Cloudflare Quick Tunnel. Tanpa akun, tanpa API key, tanpa secret sama sekali.
 
 ![Arsitektur: input pengguna mengalir melalui instalasi GitHub Actions dan registrasi CRD ke koneksi browser](assets/architecture.svg)
 
@@ -112,7 +112,7 @@ Kelebihan:
 - **Nol secret**: tidak ada PIN CRD, tidak ada token ngrok, tidak ada akun Cloudflare/Google — cukup password yang Anda set saat menjalankan workflow
 - **Bisa dari mana saja** dengan browser (browser mobile juga didukung)
 - **Desktop Aqua penuh**: WindowServer, menu aplikasi, dock, Finder — GUI macOS sungguhan
-- **Apple Silicon**: macOS 15 berjalan di runner arm64 GitHub-hosted (3 vCPU / 7 GB RAM)
+- **Apple Silicon**: macOS 14 berjalan di runner arm64 GitHub-hosted (3 vCPU / 7 GB RAM)
 - **Sleep dimatikan**: `pmset` + `caffeinate` menjaga sesi tetap hidup
 
 Batasan jujur:

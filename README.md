@@ -2,7 +2,7 @@
 
 **English** | [Bahasa Indonesia](README.id.md)
 
-> Ubuntu 24.04/26.04 on GitHub Actions + Chrome Remote Desktop. Pick your desktop — lightweight **Cinnamon**, stable **GNOME**, or ultra-fast **XFCE (Beta)** — and connect from anywhere with a PIN. Plus a **macOS 15** desktop streamed straight into your browser via noVNC + Cloudflare Quick Tunnel.
+> Ubuntu 24.04/26.04 on GitHub Actions + Chrome Remote Desktop. Pick your desktop — lightweight **Cinnamon**, stable **GNOME**, or ultra-fast **XFCE (Beta)** — and connect from anywhere with a PIN. Plus a **macOS 14** desktop streamed straight into your browser via noVNC + Cloudflare Quick Tunnel.
 
 <p align="center">
   <img src="assets/rich-linux-crd-banner.svg" alt="RICH Linux CRD banner" width="820" />
@@ -22,7 +22,7 @@
   <img src="https://img.shields.io/badge/Theme-Catppuccin-green?style=flat-square" alt="Catppuccin Theme" />
   <img src="https://img.shields.io/badge/Resolution-1600x1200-blue?style=flat-square" alt="1600x1200" />
   <img src="https://img.shields.io/badge/KVM-enabled-EE0000?style=flat-square&logo=linux&logoColor=white" alt="KVM enabled" />
-  <img src="https://img.shields.io/badge/macOS-15_+noVNC-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS 15" />
+  <img src="https://img.shields.io/badge/macOS-14_+noVNC-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS 14" />
   <img src="https://img.shields.io/badge/Tunnel-Cloudflare-brightgreen?style=flat-square" alt="Cloudflare Quick Tunnel" />
   <img src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" alt="MIT License" />
 </p>
@@ -38,7 +38,7 @@ Image sources: workflow status badges from GitHub Actions, technology badges fro
 | Feature | Detail |
 |---|---|
 | Three desktops | Cinnamon Full (approx. 1 GB), GNOME Ubuntu Desktop (approx. 2 GB), or **XFCE (Beta)** — the lightest, fastest option |
-| macOS desktop | **macOS 15 (arm64 Apple Silicon)** via built-in Screen Sharing (VNC) + noVNC browser client + Cloudflare Quick Tunnel — no account, no API key, no secrets needed |
+| macOS desktop | **macOS 14 (arm64 Apple Silicon)** via built-in Screen Sharing (VNC) + noVNC browser client + Cloudflare Quick Tunnel — no account, no API key, no secrets needed |
 | XFCE Beta | New workflow `xfce.yml` on the **ubuntu-26.04 public-preview** image — XFCE + xfwm4 for maximum responsiveness (beta: preview image, `/dev/kvm` not yet verified there) |
 | Instant remote access | Chrome Remote Desktop, default PIN `123456` (customizable via secret) |
 | Dev tools included | Google Chrome, OpenCode CLI + OpenCode Desktop (all three desktops); **VS Code** pre-installed in GNOME (install manually in Cinnamon or XFCE via `sudo apt-get install code`) |
@@ -145,7 +145,7 @@ Advantages:
 - **Zero secrets**: no CRD PIN, no ngrok token, no Cloudflare account, no Google account — just a password you set at workflow start
 - **Works from anywhere** with a browser (mobile browsers supported too)
 - **Full Aqua desktop**: WindowServer, app menu, dock, Finder — a real macOS GUI
-- **Apple Silicon**: macOS 15 runs on GitHub-hosted arm64 runners (3 vCPU / 7 GB RAM)
+- **Apple Silicon**: macOS 14 runs on GitHub-hosted arm64 runners (3 vCPU / 7 GB RAM)
 - **Sleep disabled**: `pmset` + `caffeinate` keep the session alive
 
 Honest caveats:
@@ -180,7 +180,7 @@ Running `sudo apt upgrade` inside a CRD session drops the connection (it restart
 ```mermaid
 flowchart LR
     A["You: fork repo, run workflow + paste CRD command"] --> B["GitHub Actions ubuntu-24.04"]
-    A2["You: fork repo, run macOS workflow + set VNC password"] --> B2["GitHub Actions macos-15"]
+    A2["You: fork repo, run macOS workflow + set VNC password"] --> B2["GitHub Actions macos-14"]
     B --> C["Install: Cinnamon/GNOME, Chrome, OpenCode, CRD (+ VS Code on GNOME)"]
     B2 --> C2["Install: Screen Sharing, noVNC, cloudflared"]
     C --> D["Register host, PIN 123456"]
@@ -348,7 +348,7 @@ rich-linux-crd/
 │       ├── cinnamon.yml   # RICH LINUX (Cinnamon + CRD)
 │       ├── gnome.yml      # RICH LINUX (GNOME + CRD)
 │       ├── xfce.yml       # RICH LINUX (XFCE BETA + CRD)
-│       └── macos.yml      # RICH LINUX (macOS 15 + noVNC + Cloudflare Quick Tunnel)
+│       └── macos.yml      # RICH LINUX (macOS 14 + noVNC + Cloudflare Quick Tunnel)
 ├── assets/
 │   ├── architecture.svg        # Architecture diagram used in this README
 │   ├── cinnamon-theme.zip      # Catppuccin theme + Zafiro icons (auto-installed by the Cinnamon & XFCE workflows)

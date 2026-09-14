@@ -217,23 +217,47 @@ if ! kill -0 "$NOVNC_PID" 2>/dev/null; then
 fi
 ok "noVNC proxy running (PID: ${NOVNC_PID})"
 
-nohup cloudflared tunnel --url http://127.0.0.1:6080 --no-autoupdate \
-  > /tmp/cf-tunnel.log 2>&1 &
-CF_PID=$!
-
 TUNNEL_URL=""
-for i in $(seq 1 45); do
-  TUNNEL_URL=$(grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' /tmp/cf-tunnel.log | head -1)
-  [ -n "$TUNNEL_URL" ] && break
-  sleep 1
-done
+_start_cloudflared(){
+  nohup cloudflared tunnel --url http://127.0.0.1:6080 --no-autoupdate \
+    > /tmp/cf-tunnel.log 2>&1 &
+  CF_PID=$!
+}
 
-if [ -z "$TUNNEL_URL" ]; then
-  fail "Cloudflare tunnel failed. Log:"
-  cat /tmp/cf-tunnel.log
-  exit 1
+_wait_for_tunnel(){
+  local max_wait=$1 label=$2
+  info "Menunggu Cloudflare tunnel URL (maks ${max_wait}s)... "
+  for i in $(seq 1 "$max_wait"); do
+    if ! kill -0 "$CF_PID" 2>/dev/null; then
+      warn "cloudflared mati di detik ${i}. Restarting..."
+      _start_cloudflared
+    fi
+    TUNNEL_URL=$(grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' /tmp/cf-tunnel.log | head -1)
+    if [ -n "$TUNNEL_URL" ]; then
+      ok "Tunnel URL diterima di detik ${i}."
+      return 0
+    fi
+    if [ $((i % 15)) -eq 0 ]; then
+      warn "Belum ada URL (${i}/${max_wait}s). Log cloudflared:"
+      tail -5 /tmp/cf-tunnel.log 2>/dev/null | sed 's/^/    /' || true
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+_start_cloudflared
+if ! _wait_for_tunnel 120 "first"; then
+  warn "Percobaan pertama gagal — retry dengan cloudflared baru..."
+  pkill -f "cloudflared tunnel" 2>/dev/null || true
+  sleep 3
+  _start_cloudflared
+  if ! _wait_for_tunnel 60 "retry"; then
+    fail "Cloudflare tunnel gagal setelah 2 percobaan. Full log:"
+    cat /tmp/cf-tunnel.log 2>/dev/null || echo "(log kosong)"
+    exit 1
+  fi
 fi
-ok "Tunnel ready"
 
 NOVNC_URL="${TUNNEL_URL}/vnc.html?autoconnect=true&resize=scale&reconnect=true&reconnect_delay=3000"
 

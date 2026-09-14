@@ -289,7 +289,7 @@ QEMU_COMMON=(
   -vnc :0
   -display none
   -device virtio-net-pci,netdev=net0
-  -netdev "user,id=net0,hostfwd=tcp::22-:22"
+  -netdev "user,id=net0,hostfwd=tcp::8022-:22"
   -device virtio-gpu-pci
   -device virtio-keyboard-pci
   -device virtio-mouse-pci
@@ -300,6 +300,7 @@ PHASE="installer"
 RESTART_COUNT=0
 KEEP_ALIVE_SECONDS=$((KEEP_ALIVE_MINUTES * 60))
 START_TIME=$(date +%s)
+info "SSH guest port-forward: host 127.0.0.1:8022 -> guest :22 (port 22 host dipakai SSHD runner)"
 
 while true; do
   ELAPSED=$(( $(date +%s) - START_TIME ))

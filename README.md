@@ -189,7 +189,7 @@ Advantages:
 - **Universal**: any bootable ISO — Ubuntu Server, Debian netinstall, Alpine, Fedora, Arch, etc.
 - **Works after reboot**: installer reboots into the installed OS automatically; workflow never dies
 - **Browser-based**: same noVNC + Cloudflare Quick Tunnel as the macOS workflow
-- **SSH guest port-forwarding** built in: `hostfwd=tcp::22-:22`
+- **SSH guest port-forwarding** built in: `ssh user@127.0.0.1 -p 8022` (host:8022 → guest:22; port 22 host is taken by the runner's SSHD)
 - **Auto accelerator**: uses **HVF** when the runner exposes it, otherwise same-arch TCG — and warns loudly on cross-arch (slow) combos
 
 Honest caveats:

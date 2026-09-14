@@ -155,7 +155,7 @@ Kelebihan:
 - **Universal**: ISO bootable apa pun — Ubuntu Server, Debian netinstall, Alpine, Fedora, Arch, dsb.
 - **Tetap hidup setelah reboot**: installer reboot ke OS terpasang secara otomatis; workflow tidak pernah mati
 - **Berbasis browser**: noVNC + Cloudflare Quick Tunnel yang sama seperti workflow macOS
-- **Port-forwarding SSH guest** bawaan: `hostfwd=tcp::22-:22`
+- **Port-forwarding SSH guest** bawaan: `ssh user@127.0.0.1 -p 8022` (host:8022 → guest:22; port 22 host dipakai SSHD runner)
 - **Akselerator otomatis**: memakai **HVF** jika runner mengeksposnya, selain itu TCG same-arch — dan memperingatkan keras untuk kombinasi lintas-arsitektur (lambat)
 
 Batasan jujur:

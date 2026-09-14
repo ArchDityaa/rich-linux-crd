@@ -2,7 +2,7 @@
 
 [English](README.md) | **Bahasa Indonesia**
 
-> Ubuntu 24.04/26.04 di GitHub Actions + Chrome Remote Desktop. Pilih desktop **Cinnamon** yang ringan, **GNOME** yang stabil, atau **XFCE (Beta)** paling cepat — lalu remote dari mana saja dengan PIN. Plus desktop **macOS 14** yang di-stream ke browser via noVNC + Cloudflare Quick Tunnel.
+> Ubuntu 24.04/26.04 di GitHub Actions + Chrome Remote Desktop. Pilih desktop **Cinnamon** yang ringan, **GNOME** yang stabil, atau **XFCE (Beta)** paling cepat — lalu remote dari mana saja dengan PIN. Plus desktop **macOS 14** yang di-stream ke browser via noVNC + Cloudflare Quick Tunnel, dan **Universal VM Runner** untuk boot ISO Linux apa pun di QEMU dengan akses browser.
 
 <p align="center">
   <img src="assets/rich-linux-crd-banner.svg" alt="Banner RICH Linux CRD" width="820" />
@@ -20,6 +20,7 @@ Dokumen utama (lengkap, dalam Bahasa Inggris): [README.md](README.md). Halaman i
 - **Tanpa snap** — `snapd` + deb transisi `thunderbird`/`firefox` di-purge dan di-hold, sehingga tidak ada hang "retry 30 menit ke snap store" saat install desktop. Tradeoff: `snap install` dan katalog Snap di GNOME Software tidak tersedia.
 - **XFCE Beta** — desktop ketiga, paling ringan & cepat (`xfce.yml`), memakai runner image **`ubuntu-26.04` public preview**. Label "beta" memang sengaja: image masih preview. KVM di image ini belum terverifikasi → warn-only.
 - **macOS 14** — desktop macOS asli (Apple Silicon arm64) via Screen Sharing bawaan + noVNC di browser + Cloudflare Quick Tunnel. Tanpa akun, tanpa API key, tanpa secret sama sekali.
+- **Universal VM Runner** — boot ISO Linux apa pun di dalam QEMU (di runner macOS), tampilan VM di-stream ke browser via noVNC. Setelah install selesai & reboot, VM otomatis boot dari disk (bukan installer lagi).
 
 ![Arsitektur: input pengguna mengalir melalui instalasi GitHub Actions dan registrasi CRD ke koneksi browser](assets/architecture.svg)
 
@@ -123,6 +124,44 @@ Batasan jujur:
 - Masa hidup runner maksimal **6 jam** (timeout job Actions); untuk sesi lebih lama, jalankan ulang workflow
 - **Belum ada helper safe-upgrade** untuk macOS — gunakan `brew upgrade` manual di terminal (beda dengan `apt upgrade` di Linux, `brew upgrade` tidak me-restart stack display di tengah sesi)
 
+### Universal VM Runner — Boot ISO Linux Apa Pun di QEMU
+
+Mau menguji distro, menjalankan workload server, atau menginstal OS sendiri — tanpa menyentuh sesi host? **Universal VM Runner** (`vm-runner.yml`) mem-boot **ISO Linux live/install apa pun** di dalam QEMU pada runner macOS arm64, lalu menampilkan layar VM langsung ke browser via noVNC + Cloudflare Quick Tunnel.
+
+Anda cukup menempelkan **URL ISO** di input workflow. Tidak ada secret, tidak ada akun, tidak ada konfigurasi Cloudflare.
+
+Cara kerjanya:
+
+1. **`iso_url`** — tempel tautan langsung ke `.iso` apa pun (Linux ARM64 disarankan; lihat batasan)
+2. QEMU mem-boot ISO sebagai CD-ROM, display VNC di port 5900
+3. noVNC + Cloudflare Quick Tunnel mengalirkan VM ke browser
+4. Instal OS, lalu **reboot** dari dalam VM
+5. `-boot once=d` + `-no-reboot` membuat QEMU **otomatis beralih ke disk** — setelah installer reboot, VM boot ke OS terpasang, bukan installer lagi
+6. Workflow tetap hidup dari proses install → reboot → OS terpasang
+
+**Input** (workflow_dispatch):
+
+| Input | Wajib | Default | Deskripsi |
+|---|---|---|---|
+| `iso_url` | ya | — | URL langsung ke ISO installer/Live |
+| `vm_memory` | tidak | `2G` | RAM VM |
+| `vm_cpus` | tidak | `2` | vCPU VM (maks 3 di runner arm64) |
+| `disk_size` | tidak | `20G` | Ukuran disk virtual (qcow2 sparse) |
+| `keep_alive_minutes` | tidak | `360` | Lama sesi (maks 360) |
+
+Kelebihan:
+- **Universal**: ISO bootable apa pun — Ubuntu Server, Debian netinstall, Alpine, Fedora, Arch, dsb.
+- **Tetap hidup setelah reboot**: installer reboot ke OS terpasang secara otomatis; workflow tidak pernah mati
+- **Berbasis browser**: noVNC + Cloudflare Quick Tunnel yang sama seperti workflow macOS
+- **Port-forwarding SSH guest** bawaan: `hostfwd=tcp::22-:22`
+
+Batasan jujur:
+- **Tidak ada HVF/KVM di runner macOS GitHub-hosted** (`actions/runner-images#13505` ditutup "not planned") — QEMU berjalan dengan **TCG software emulation**. ISO **Linux ARM64** pada runner ARM64 ini lumayan cepat; ISO **x86_64** lambat (emulasi lintas-arsitektur). Gunakan ISO ARM64 untuk pengalaman terbaik.
+- **Disk runner 14 GB** — ISO besar >4 GB ditambah qcow2 besar bisa tidak muat. Pilih ISO ramping/netinstall, dan gunakan URL unduhan langsung (bukan halaman browser).
+- **Koneksi VNC putus sesaat** saat VM reboot (beberapa detik; noVNC auto-reconnect dengan `reconnect=true&reconnect_delay=3000`).
+- **Disk ephemeral** — qcow2 berada di runner dan hilang saat workflow berakhir. Belum ada persistensi.
+- **ISO tamu macOS belum didukung** di versi pertama ini (tamu macOS butuh konfigurasi bootloader OpenCore).
+
 ### Upgrade Anti-Putus
 
 Menjalankan `sudo apt upgrade` di dalam sesi CRD memutus koneksi (karena me-restart service CRD/GNOME/systemd). Helper [`safe-upgrade`](scripts/safe-upgrade.sh) menyelesaikan ini:
@@ -166,7 +205,8 @@ Workflow memakai `workflow_dispatch`, jadi **harus dijalankan dari fork milik An
    - **RICH LINUX (GNOME + Chrome Remote Desktop)** → file `.github/workflows/gnome.yml`
    - **RICH LINUX (XFCE Beta + Chrome Remote Desktop)** → file `.github/workflows/xfce.yml` (public-preview `ubuntu-26.04`, **beta**)
    - **RICH LINUX (macOS + noVNC + Cloudflare Quick Tunnel)** → file `.github/workflows/macos.yml` (lihat bagian [macOS](#macos--screen-sharing-bawaan-via-browser))
-3. Klik **Run workflow**, tempel perintah CRD ke field `crd_host_command`, klik **Run** (untuk workflow macOS isi field `vnc_password`).
+   - **Universal VM Runner (QEMU + noVNC + Cloudflare)** → file `.github/workflows/vm-runner.yml` (lihat bagian [Universal VM Runner](#universal-vm-runner--boot-iso-linux-apa-pun-di-qemu))
+3. Klik **Run workflow**, tempel perintah CRD ke field `crd_host_command`, klik **Run** (untuk workflow macOS isi field `vnc_password`; untuk VM Runner isi field `iso_url`).
 4. Tunggu sekitar 5–10 menit sampai log menampilkan `CHROME REMOTE DESKTOP READY` (atau `MACOS REMOTE DESKTOP READY` untuk macOS).
 
 ### 3. Connect
@@ -288,7 +328,7 @@ virsh -c qemu:///system list --all
 
 ```
 rich-linux-crd/
-├── .github/workflows/       # cinnamon.yml, gnome.yml, xfce.yml (XFCE = beta), macos.yml
+├── .github/workflows/       # cinnamon.yml, gnome.yml, xfce.yml (XFCE = beta), macos.yml, vm-runner.yml
 ├── assets/
 │   ├── architecture.svg     # Diagram arsitektur di README
 │   ├── cinnamon-theme.zip   # Tema Catppuccin + ikon Zafiro (otomatis diinstal oleh workflow Cinnamon & XFCE)
@@ -296,7 +336,10 @@ rich-linux-crd/
 │   └── rich-linux-crd-logo.svg
 ├── opencode-setup/          # opencode-skills.md (panduan skill agent OpenCode + Context7)
 ├── scripts/                 # safe-upgrade.sh (version diff, --cleanup, rollback log, summary, reboot check)
-│   └── mac/setup-remote-access.sh  # macOS: Screen Sharing + noVNC + Cloudflare Quick Tunnel
+│   ├── mac/
+│   │   └── setup-remote-access.sh  # macOS: Screen Sharing + noVNC + Cloudflare Quick Tunnel
+│   └── qemu/
+│       └── setup-vm.sh             # Universal VM: download ISO, qcow2 disk, boot loop QEMU, noVNC, tunnel
 ├── README.md                # Dokumen utama (Inggris)
 ├── README.id.md             # File ini (Indonesia)
 ├── AGENTS.md                # Panduan melanjutkan proyek untuk agent/dev (Bahasa Indonesia)

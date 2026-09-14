@@ -195,6 +195,33 @@ if [ ! -f "$NOVNC_DIR/utils/websockify/run" ]; then
   git clone --depth 1 https://github.com/novnc/websockify.git "$NOVNC_DIR/utils/websockify"
 fi
 
+# ============================================================
+# PATCH: PAKSA VNC DES (TYPE 2), BUKAN ARD (TYPE 30)
+# ============================================================
+# Masalah: macOS 15 screensharingd mengiklankan security types
+#   [30 (ARD), 33 (RSA), 36 (SRP), 2 (VNC DES), 35]
+# noVNC mendukung type 30 (ARD) dan memilihnya karena paling awal di list
+# -> noVNC coba ARD auth -> implementasinya broken di macOS 15 -> selalau
+#   "Authentication or authorization failure".
+# Fix: hapus `securityTypeARD` dari daftar supported di core/rfb.js.
+#   noVNC lalu skip 30/33/36 dan memilih type 2 (VNC DES, password saja).
+echo ""
+echo -e "${C_CYAN}[3/5] Patch noVNC: hapus ARD (type 30) dari supported security types ...${C_NC}"
+RFB_JS="$NOVNC_DIR/core/rfb.js"
+if grep -q 'securityTypeARD,' "$RFB_JS"; then
+  # Hapus baris persis `securityTypeARD,` PADA array _isSupportedSecurityType.
+  # (Deklarasi `const securityTypeARD = 30;` dan `case securityTypeARD:`
+  #  dibiarkan utuh — pattern ini hanya cocok dengan entry bertanda koma.)
+  sed -i '' '/^[[:space:]]*securityTypeARD[[:space:]]*,/d' "$RFB_JS"
+  if grep -q 'securityTypeARD,' "$RFB_JS"; then
+    echo -e "${C_RED}[WARN] Gagal patch rfb.js — ARD masih didukung, auth bisa gagal lagi.${C_NC}"
+  else
+    echo -e "${C_GREEN}[OK] ARD (type 30) dihapus. noVNC kini memakai VNC DES (type 2) — password saja, tanpa username.${C_NC}"
+  fi
+else
+  echo -e "${C_YELLOW}[INFO] securityTypeARD tidak ditemukan di rfb.js — versi berbeda / sudah OK.${C_NC}"
+fi
+
 pkill -f 'novnc_proxy' 2>/dev/null || true
 pkill -f 'websockify' 2>/dev/null || true
 nohup "$NOVNC_DIR/utils/novnc_proxy" \
@@ -275,7 +302,7 @@ echo -e "      ${C_CYAN}${TUNNEL_URL}/vnc.html${C_NC}"
 echo -e "      [INFO] Connection type     : noVNC (web) + Cloudflare Quick Tunnel"
 echo -e "      [INFO] User                : runner"
 echo -e "      [INFO] VNC Password        : $VNC_PASSWORD"
-echo -e "      [INFO] NoVNC               : Username: runner | Password: (sama dengan input workflow)"
+echo -e "      [INFO] NoVNC               : masukkan VNC Password SAJA (username TIDAK diperlukan — VNC DES auth)"
 echo -e "      [INFO] Direct VNC          : vnc://localhost:5900 (local only)"
 echo "=============================================================="
 

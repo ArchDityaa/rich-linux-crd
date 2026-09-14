@@ -149,11 +149,19 @@ jobs:
           fi
           echo "::endgroup::"
 
+          echo "::group::[CHECK] noVNC ARD patch (password-only VNC DES auth)"
+          if grep -q 'securityTypeARD,' /tmp/noVNC/core/rfb.js 2>/dev/null; then
+            echo -e "${C_RED}[FAIL] ARD (type 30) MASIH didukung di rfb.js — auth noVNC bisa gagal!${C_NC}"
+          else
+            echo -e "${C_GREEN}[OK] ARD (type 30) sudah dihapus — noVNC pakai VNC DES (type 2).${C_NC}"
+          fi
+          echo "::endgroup::"
+
           echo "::group::[CHECK] Cloudflare Quick Tunnel"
           if [ -f /tmp/cf-tunnel-url.txt ]; then
             TUNNEL_URL=$(cat /tmp/cf-tunnel-url.txt)
             echo -e "${C_GREEN}[OK] Tunnel URL: ${C_CYAN}${TUNNEL_URL}/vnc.html${C_NC}"
-            echo "::notice::macOS desktop siap! Buka ${TUNNEL_URL}/vnc.html?autoconnect=true&resize=scale di browser, masukkan Username: runner, Password: (sama dengan input workflow)."
+            echo "::notice::macOS desktop siap! Buka ${TUNNEL_URL}/vnc.html?autoconnect=true&resize=scale di browser, masukkan VNC Password SAJA (sama dengan input workflow). Username tidak diperlukan (VNC DES auth)."
           else
             echo -e "${C_RED}[FAIL] /tmp/cf-tunnel-url.txt tidak ditemukan!${C_NC}"
             echo "  Log cloudflared (last 25 lines):"
@@ -310,7 +318,7 @@ jobs:
           TUNNEL_URL="$(cat /tmp/cf-tunnel-url.txt 2>/dev/null || true)"
           echo -e "  ${C_YELLOW}[INFO] Open : ${C_CYAN}${TUNNEL_URL:-<tunnel url>}${C_NC}"
           echo -e "  ${C_YELLOW}[INFO] User : runner${C_NC}"
-          echo -e "  ${C_YELLOW}[INFO] NoVNC: Username: runner | Password: (sama dengan input workflow)${C_NC}"
+          echo -e "  ${C_YELLOW}[INFO] NoVNC: masukkan VNC Password SAJA (username tidak diperlukan — VNC DES auth)${C_NC}"
           echo -e "  ${C_YELLOW}[INFO] Keep-alive: ${{ inputs.keep_alive_minutes }} menit. Jangan cancel workflow.${C_NC}"
           echo -e "  [INFO] Coba: open ${TUNNEL_URL:-<tunnel url>}"
           echo "=============================================================="

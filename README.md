@@ -2,7 +2,7 @@
 
 **English** | [Bahasa Indonesia](README.id.md)
 
-> Ubuntu 24.04/26.04 on GitHub Actions + Chrome Remote Desktop. Pick your desktop — lightweight **Cinnamon**, stable **GNOME**, or ultra-fast **XFCE (Beta)** — and connect from anywhere with a PIN. Plus a **macOS 15** desktop streamed straight into your browser via noVNC + Cloudflare Quick Tunnel, and a **Universal VM Runner** that boots any Linux ISO in QEMU with browser access.
+> Ubuntu 24.04/26.04 on GitHub Actions + Chrome Remote Desktop. Pick your desktop — lightweight **Cinnamon**, stable **GNOME**, or ultra-fast **XFCE (Beta)** — and connect from anywhere with a PIN. Plus a **macOS 15** desktop streamed straight into your browser via noVNC + Cloudflare Quick Tunnel.
 
 <p align="center">
   <img src="assets/rich-linux-crd-banner.svg" alt="RICH Linux CRD banner" width="820" />
@@ -13,7 +13,6 @@
   <a href="https://github.com/kiraadityaa/rich-linux-crd/actions/workflows/gnome.yml"><img src="https://github.com/kiraadityaa/rich-linux-crd/actions/workflows/gnome.yml/badge.svg" alt="GNOME workflow status" /></a>
   <a href="https://github.com/kiraadityaa/rich-linux-crd/actions/workflows/xfce.yml"><img src="https://github.com/kiraadityaa/rich-linux-crd/actions/workflows/xfce.yml/badge.svg" alt="XFCE workflow status" /></a>
   <a href="https://github.com/kiraadityaa/rich-linux-crd/actions/workflows/macos.yml"><img src="https://github.com/kiraadityaa/rich-linux-crd/actions/workflows/macos.yml/badge.svg" alt="macOS workflow status" /></a>
-  <a href="https://github.com/kiraadityaa/rich-linux-crd/actions/workflows/vm-runner.yml"><img src="https://github.com/kiraadityaa/rich-linux-crd/actions/workflows/vm-runner.yml/badge.svg" alt="VM Runner workflow status" /></a>
   <img src="https://img.shields.io/badge/Ubuntu-24.04-E95420?style=flat-square&logo=ubuntu&logoColor=white" alt="Ubuntu 24.04" />
   <img src="https://img.shields.io/badge/Ubuntu_26.04-Preview-772953?style=flat-square&logo=ubuntu&logoColor=white" alt="Ubuntu 26.04 Preview" />
   <img src="https://img.shields.io/badge/Cinnamon-Full-success?style=flat-square" alt="Cinnamon" />
@@ -26,7 +25,6 @@
   <img src="https://img.shields.io/badge/Resolution-1600x1200-blue?style=flat-square" alt="1600x1200" />
   <img src="https://img.shields.io/badge/KVM-enabled-EE0000?style=flat-square&logo=linux&logoColor=white" alt="KVM enabled" />
   <img src="https://img.shields.io/badge/macOS-15_+noVNC-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS 15" />
-  <img src="https://img.shields.io/badge/VM_Runner-QEMU+noVNC-blue?style=flat-square&logo=qemu&logoColor=white" alt="Universal VM Runner (QEMU)" />
   <img src="https://img.shields.io/badge/Tunnel-Cloudflare-brightgreen?style=flat-square" alt="Cloudflare Quick Tunnel" />
   <img src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" alt="MIT License" />
 </p>
@@ -44,7 +42,6 @@
   - [KVM Hardware-Accelerated Virtualization](#kvm-hardware-accelerated-virtualization)
   - [XFCE (Beta) — Fastest Desktop](#xfce-beta--fastest-desktop)
   - [macOS — Built-in Screen Sharing via Browser](#macos--built-in-screen-sharing-via-browser)
-  - [Universal VM Runner — Boot Any Linux ISO in QEMU](#universal-vm-runner--boot-any-linux-iso-in-qemu)
   - [Disconnect-Safe Upgrades](#disconnect-safe-upgrades)
 - [How it works](#how-it-works)
 - [Quick Start (5 minutes)](#quick-start-5-minutes)
@@ -71,7 +68,6 @@ Image sources: workflow status badges from GitHub Actions, technology badges fro
 |---|---|
 | Three desktops | Cinnamon Full (approx. 1 GB), GNOME Ubuntu Desktop (approx. 2 GB), or **XFCE (Beta)** — the lightest, fastest option |
 | macOS desktop | **macOS 15 (arm64 Apple Silicon)** via built-in Screen Sharing (VNC) + noVNC browser client + Cloudflare Quick Tunnel — no account, no API key, no secrets needed |
-| Universal VM Runner | Boot **any Linux ISO** in QEMU on a macOS runner — user provides the ISO URL, sees the live VM in the browser via noVNC; boots disk once installed with automatic ISO fallback |
 | XFCE Beta | New workflow `xfce.yml` on the **ubuntu-26.04 public-preview** image — XFCE + xfwm4 for maximum responsiveness (beta: preview image, `/dev/kvm` not yet verified there) |
 | Instant remote access | Chrome Remote Desktop, default PIN `123456` (customizable via secret) |
 | Dev tools included | Google Chrome, OpenCode CLI + OpenCode Desktop (all three desktops); **VS Code** pre-installed in GNOME (install manually in Cinnamon or XFCE via `sudo apt-get install code`) |
@@ -193,47 +189,11 @@ Honest caveats:
 - The runner has a 6-hour maximum lifetime (Actions job timeout). For longer sessions, re-run the workflow.
 - **No safe-upgrade helper** for macOS yet — use `brew upgrade` manually in the terminal (unlike `apt upgrade` on Linux, `brew upgrade` does not restart the display stack mid-session)
 
-### Universal VM Runner — Boot Any Linux ISO in QEMU
+### Related project: Universal VM Runner
 
-Want to test a distro, run a server workload, or install your own OS — without touching the host session? The **Universal VM Runner** (`vm-runner.yml`) boots **any live/install Linux ISO** inside QEMU on a macOS runner and serves the VM's display straight into your browser via noVNC + Cloudflare Quick Tunnel.
+The **Universal VM Runner** — boot **any Linux ISO** in QEMU on a free macOS runner and stream it to your browser via noVNC + Cloudflare Quick Tunnel, with self-healing boot (`-boot order=cd`, no "no bootable device" trap) — now lives in its own repo:
 
-You provide an **ISO URL** in the workflow inputs. That's it. No secrets, no accounts, no Cloudflare config.
-
-Runs on **`macos-15-intel`** (4 vCPU / **14 GB RAM**, free on public repos) — the highest-spec free macOS runner. Architecture is auto-detected: x86_64/amd64 ISOs are recommended (popular, well-tested); the script detects **HVF** (`sysctl kern.hv_support`) and uses hardware acceleration when available, falling back to TCG.
-
-How it works:
-
-1. **`iso_url`** — paste a direct link to any `.iso` (x86_64/amd64 recommended; see caveats)
-2. QEMU boots the ISO as a CD-ROM, VNC display exposed on port 5900
-3. noVNC + Cloudflare Quick Tunnel stream the VM to any browser
-4. Install the OS, then **reboot** from inside the VM
-5. **Self-healing boot**: every restart runs the same QEMU command with `-boot order=cd` — the firmware tries the hard disk first and falls back to the ISO while the disk isn't bootable yet. The VM boots the installed OS once the disk is ready, and re-enters the installer if a reboot happens before installation is complete (no "no bootable device" trap)
-6. The workflow stays alive through the whole install → reboot → installed-OS cycle
-
-**Inputs** (workflow_dispatch):
-
-| Input | Required | Default | Description |
-|---|---|---|---|
-| `iso_url` | yes | — | Direct URL to the installer/Live ISO |
-| `vm_memory` | no | `8G` | VM RAM (14 GB available on Intel runner) |
-| `vm_cpus` | no | `4` | VM vCPUs (max 4 on Intel runner) |
-| `disk_size` | no | `20G` | Virtual disk size (sparse qcow2) |
-| `keep_alive_minutes` | no | `360` | Session length (max 360) |
-
-Advantages:
-- **Universal**: any bootable ISO — Ubuntu Server, Debian netinstall, Alpine, Fedora, Arch, etc.
-- **Works after reboot**: the firmware picks the disk once it's bootable and re-enters the ISO otherwise — no assumption that a reboot means the installer finished
-- **Browser-based**: same noVNC + Cloudflare Quick Tunnel as the macOS workflow
-- **SSH guest port-forwarding** built in: `ssh user@127.0.0.1 -p 8022` (host:8022 → guest:22; port 22 host is taken by the runner's SSHD)
-- **Auto accelerator**: uses **HVF** when the runner exposes it, otherwise same-arch TCG — and warns loudly on cross-arch (slow) combos
-
-Honest caveats:
-- **HVF/KVM availability varies**: GitHub-hosted macOS runners generally lack nested virtualization (arm64 guaranteed not; Intel may expose `kern.hv_support=1`). The script detects it at runtime — HVF if available, else **TCG** (software emulation). Matching the **guest arch to the runner arch** keeps TCG usable; a cross-arch mix (e.g. ARM64 ISO on the Intel runner) is very slow.
-- **14 GB runner disk** — a large ISO >4 GB plus a big qcow2 may not fit. Prefer slim ISO/netinstall images, and use an ISO download URL that doesn't require a browser (direct link).
-- **Brief VNC drop** on VM reboot (a few seconds; noVNC auto-reconnects with `reconnect=true&reconnect_delay=3000`).
-- **ISO stays attached** during the installed OS — harmless (disk boots first), but a Debian "remove installation media" prompt at the end of the installer is purely informational; pressing Enter still reboots into the installed OS.
-- **Ephemeral disk** — the qcow2 lives on the runner and is lost when the workflow ends. No persistence yet.
-- **macOS guest ISOs unsupported** in this first version (macOS guests need OpenCore bootloader configuration).
+**[kiraadityaa/universal-vm-runner](https://github.com/kiraadityaa/universal-vm-runner)** — `.github/workflows/vm-runner.yml` + `scripts/qemu/setup-vm.sh`, with standalone README, inputs, and caveats.
 
 ### Disconnect-Safe Upgrades
 
@@ -296,8 +256,7 @@ Workflows use `workflow_dispatch`, so **you must run them from your own fork** �
    - **RICH LINUX (GNOME + Chrome Remote Desktop)** → file `.github/workflows/gnome.yml`
    - **RICH LINUX (XFCE Beta + Chrome Remote Desktop)** → file `.github/workflows/xfce.yml` (public-preview `ubuntu-26.04`, **beta**)
    - **RICH LINUX (macOS + noVNC + Cloudflare Quick Tunnel)** → file `.github/workflows/macos.yml` (see the [macOS section](#macos--built-in-screen-sharing-via-browser))
-   - **Universal VM Runner (QEMU + noVNC + Cloudflare)** → file `.github/workflows/vm-runner.yml` (see the [VM Runner section](#universal-vm-runner--boot-any-linux-iso-in-qemu))
-3. Click **Run workflow**, paste the CRD command into the `crd_host_command` field, click **Run** (for the macOS workflow, fill in the `vnc_password` field instead; for the VM Runner, fill in `iso_url`).
+3. Click **Run workflow**, paste the CRD command into the `crd_host_command` field, click **Run** (for the macOS workflow, fill in the `vnc_password` field instead).
 4. Wait approx. 5–10 minutes until the log shows `CHROME REMOTE DESKTOP READY` (or `MACOS REMOTE DESKTOP READY` for macOS).
 
 ### 3. Connect
@@ -429,7 +388,6 @@ rich-linux-crd/
 │       ├── gnome.yml      # RICH LINUX (GNOME + CRD)
 │       ├── xfce.yml       # RICH LINUX (XFCE BETA + CRD)
 │       ├── macos.yml      # RICH LINUX (macOS 15 + noVNC + Cloudflare Quick Tunnel)
-│       ├── vm-runner.yml  # Universal VM Runner (QEMU + noVNC + Cloudflare Quick Tunnel)
 │       └── stable.yml     # LEGACY — superseded by cinnamon.yml (kept for reference only)
 ├── assets/
 │   ├── architecture.svg        # Architecture diagram used in this README
@@ -442,10 +400,8 @@ rich-linux-crd/
 ├── scripts/
 │   ├── safe-upgrade.sh         # Safe in-session upgrade (replacement for apt upgrade), with version diff,
 │   │                           # --cleanup autoremove, rollback logs, summary table, kernel reboot check
-│   ├── mac/
-│   │   └── setup-remote-access.sh  # macOS: enable Screen Sharing + noVNC + Cloudflare Quick Tunnel
-│   └── qemu/
-│       └── setup-vm.sh         # Universal VM: download ISO, qcow2 disk, QEMU boot loop, noVNC, tunnel
+│   └── mac/
+│       └── setup-remote-access.sh  # macOS: enable Screen Sharing + noVNC + Cloudflare Quick Tunnel
 ├── README.md            # This file (English)
 ├── README.id.md         # Indonesian summary
 ├── LICENSE

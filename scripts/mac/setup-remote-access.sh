@@ -65,7 +65,28 @@ if [ ! -x "$KICKSTART" ]; then
 fi
 
 # Set password akun `runner` (dipakai bila klien pakai username/password).
-sudo dscl . -passwd /Users/runner "$VNC_PASSWORD"
+# Catatan (macOS 15/Sequoia): `dscl . -passwd` untuk user lokal dengan secure
+# token menolak reset via root (DS Error -14090 eDSAuthFailed). Maka:
+#   1) coba dscl dulu (`</dev/null` agar prompt password lama langsung EOF),
+#   2) fallback ke `sysadminctl -resetPasswordFor` (pengganti resmi, tanpa
+#      password lama),
+#   3) jika keduanya gagal -> non-fatal: auth noVNC tetap lewat VNC password
+#      yang di-set via `kickstart -setvncpw`, bukan password user macOS.
+set_runner_password() {
+  if sudo dscl . -passwd /Users/runner "$VNC_PASSWORD" </dev/null >/dev/null 2>&1; then
+    echo -e "${C_GREEN}[OK] Password user 'runner' diset via dscl.${C_NC}"
+    return 0
+  fi
+
+  if sudo sysadminctl -resetPasswordFor runner -newPassword "$VNC_PASSWORD" >/dev/null 2>&1; then
+    echo -e "${C_GREEN}[OK] Password user 'runner' diset via sysadminctl.${C_NC}"
+    return 0
+  fi
+
+  echo -e "${C_YELLOW}[WARN] Tidak bisa set password user 'runner'; lanjut.\n      (Auth noVNC memakai VNC password dari kickstart -setvncpw.)${C_NC}"
+  return 0
+}
+set_runner_password
 
 # Aktifkan Remote Management / Screen Sharing + VNC-only password (legacy).
 # `-setvnclegacy` membuat koneksi raw VNC (noVNC / RealVNC / mstsc) dapat

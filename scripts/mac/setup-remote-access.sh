@@ -275,7 +275,7 @@ echo -e "      ${C_CYAN}${TUNNEL_URL}/vnc.html${C_NC}"
 echo -e "      [INFO] Connection type     : noVNC (web) + Cloudflare Quick Tunnel"
 echo -e "      [INFO] User                : runner"
 echo -e "      [INFO] VNC Password        : $VNC_PASSWORD"
-echo -e "      [INFO] NoVNC               : masukkan password di atas (Username tidak perlu diisi)"
+echo -e "      [INFO] NoVNC               : Username: runner | Password: (sama dengan input workflow)"
 echo -e "      [INFO] Direct VNC          : vnc://localhost:5900 (local only)"
 echo "=============================================================="
 

@@ -15,6 +15,38 @@ jobs:
 
     steps:
 
+      # ============================================================
+      # VM SPEC CHECK (10 DETIK UNTUK MEMUTUSKAN)
+      # Tampilkan spesifikasi runner di PALING AWAL. User diberi jeda
+      # 10 detik: kalau spesifikasi sesuai, biarkan lanjut. Kalau tidak
+      # sesuai, CANCEL workflow di UI GitHub sebelum timeout.
+      # ============================================================
+      - name: VM Spec Check (10s to cancel)
+        run: |
+          C_CYAN='\033[1;36m'; C_GREEN='\033[1;32m'; C_YELLOW='\033[1;33m'; C_RED='\033[1;31m'; C_NC='\033[0m'
+          CORE_COUNT=$(nproc)
+          CPU_MODEL=$(grep '^model name' /proc/cpuinfo | head -n1 | sed 's/.*: //' || echo '?')
+          RAM_TOTAL=$(free -h | awk 'NR==2 {print $2}')
+          DISK_FREE=$(df -h / | awk 'NR==2 {print $4}')
+          UNAME=$(uname -r)
+
+          echo ""
+          echo "=============================================================="
+          echo -e "${C_CYAN}            VM SPECIFICATION (GitHub runner)${C_NC}"
+          echo "=============================================================="
+          echo -e "  ${C_YELLOW}CPU     :${C_NC} $CPU_MODEL"
+          echo -e "  ${C_YELLOW}Cores   :${C_NC} $CORE_COUNT (threads)"
+          echo -e "  ${C_YELLOW}RAM     :${C_NC} $RAM_TOTAL"
+          echo -e "  ${C_YELLOW}Disk    :${C_NC} ${DISK_FREE} free"
+          echo -e "  ${C_YELLOW}Kernel  :${C_NC} $UNAME"
+          echo "=============================================================="
+          echo -e "${C_GREEN}[INFO] Jika spesifikasi ini sesuai, biarkan lanjut.${C_NC}"
+          echo -e "${C_RED}[INFO] Jika TIDAK sesuai, CANCEL workflow sekarang (10 detik).${C_NC}"
+          echo "=============================================================="
+          echo ""
+          sleep 10
+          echo -e "${C_GREEN}[OK] Lanjut instalasi (spesifikasi disetujui / tidak di-cancel).${C_NC}"
+
       - name: Checkout repository (for safe-upgrade helper)
         uses: actions/checkout@v4
 
@@ -42,7 +74,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 01/17] PREPARE SYSTEM${C_NC}"
+          echo -e "${C_CYAN}[STEP 01/16] PREPARE SYSTEM${C_NC}"
           echo "------------------------------------------------------------"
 
           __prepare_start=$(date +%s)
@@ -77,7 +109,39 @@ jobs:
           sudo mkdir -p /var/cache/apt/archives/partial
           sudo cp -a /home/runner/apt-archives/. /var/cache/apt/archives/ 2>/dev/null || true
 
-          echo -e "${C_YELLOW}[INFO] Updating package lists...${C_NC}"
+          # ============================================================
+          # REPO VS CODE + CRD DI-SETUP DI SINI (SEBELUM update) sehingga
+          # CUKUP SATU `apt-get update` untuk base + vscode + crd.
+          # Steps 05 (VS Code) & 07 (CRD) tidak perlu apt-get update lagi
+          # -> hemat ~2x update + lebih tahan terhadap hang update.
+          # ============================================================
+          echo -e "${C_YELLOW}[INFO] Setting up VS Code + CRD repositories (single apt-get update)...${C_NC}"
+          sudo mkdir -p /etc/apt/keyrings
+
+          echo -e "${C_YELLOW}[INFO]   Microsoft key (VS Code)...${C_NC}"
+          if [ -s /tmp/packages.microsoft.gpg ]; then
+            sudo cp /tmp/packages.microsoft.gpg /etc/apt/keyrings/packages.microsoft.gpg
+          else
+            wget -qO- https://packages.microsoft.com/keys/microsoft.asc \
+              | gpg --dearmor \
+              | sudo tee /etc/apt/keyrings/packages.microsoft.gpg > /dev/null
+          fi
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" \
+            | sudo tee /etc/apt/sources.list.d/vscode.list > /dev/null
+
+          echo -e "${C_YELLOW}[INFO]   Google key (Chrome Remote Desktop)...${C_NC}"
+          if [ -s /tmp/linux_signing_key.pub ]; then
+            gpg --dearmor < /tmp/linux_signing_key.pub \
+              | sudo tee /etc/apt/keyrings/google-linux.gpg > /dev/null
+          else
+            wget -qO- https://dl.google.com/linux/linux_signing_key.pub \
+              | gpg --dearmor \
+              | sudo tee /etc/apt/keyrings/google-linux.gpg > /dev/null
+          fi
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-linux.gpg] http://dl.google.com/linux/chrome-remote-desktop/deb/ stable main" \
+            | sudo tee /etc/apt/sources.list.d/chrome-remote-desktop.list > /dev/null
+
+          echo -e "${C_YELLOW}[INFO] Updating package lists (SATU update utk base + vscode + crd)...${C_NC}"
           sudo apt-get update
 
           # eatmydata: wrapper apt/dpkg yang membuang SEMUA fsync (termasuk di
@@ -96,6 +160,26 @@ jobs:
             || true
 
           sudo eatmydata apt-get autoremove -y || true
+
+          # ============================================================
+          # HAPUS SNAP PALING AWAL (sebelum upgrade/install apt apa pun).
+          # Firewall terakhir: pin + purge + hold keliru bisa jadi bocor —
+          # deb transisi firefox/thunderbird (1snap1) punya postinst yang
+          # memaksa 'snap install firefox' + retry ke store (hang 30 menit)
+          # SELAMA unpack dpkg. Karena itu snapd + transisi di-purge & di-hold
+          # DI SINI, sebelum full upgrade, supaya tak pernah ter-unpack.
+          # ============================================================
+          echo -e "${C_YELLOW}[INFO] Purge snapd + firefox/thunderbird transitional EARLY (sebelum upgrade/install)...${C_NC}"
+          sudo tee /etc/apt/preferences.d/99-no-snap.pref > /dev/null <<'PREFE'
+          Package: snapd thunderbird firefox
+          Pin: version *
+          Pin-Priority: -10
+          PREFE
+
+          sudo eatmydata apt-get purge -y snapd firefox thunderbird || true
+          sudo apt-mark hold snapd firefox thunderbird 2>/dev/null || true
+          sudo rm -rf /snap /var/snap /var/lib/snapd /root/snap /home/runner/snap 2>/dev/null || true
+          command -v snap >/dev/null 2>&1 && echo -e "${C_YELLOW}[WARN] snap masih ada.${C_NC}" || echo -e "${C_GREEN}[OK] snap dihapus permanen (sebelum apt upgrade).${C_NC}"
 
           # Full upgrade di BUILD-TIME (aman, sebelum CRD/session jalan).
           # Jangan `apt upgrade` manual dari dalam sesi CRD — itu me-restart
@@ -122,7 +206,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 02/17] INSTALL GNOME DESKTOP${C_NC}"
+          echo -e "${C_CYAN}[STEP 02/16] INSTALL GNOME DESKTOP${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Installing full GNOME desktop (approx 2GB, please wait)...${C_NC}"
@@ -136,12 +220,6 @@ jobs:
           echo -e "${C_YELLOW}[INFO] Pre-downloading external assets in background (parallel w/ apt)...${C_NC}"
           nohup wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/google-chrome.deb &
           CHROME_DL=$!
-          nohup bash -c 'wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /tmp/packages.microsoft.gpg' &
-          VSC_KB_DL=$!
-          nohup wget -q https://opencode.ai/download/stable/linux-x64-deb -O /tmp/opencode-desktop.deb &
-          OCD_DL=$!
-          nohup wget -q https://dl.google.com/linux/linux_signing_key.pub -O /tmp/linux_signing_key.pub &
-          CRD_KEY_DL=$!
 
           # Slim font: metapackage fonts-noto merekomendasikan font raksasa
           # (fonts-noto-cjk 61MB, cjk-extra 145MB, extra 78.5MB) yang tidak
@@ -154,17 +232,10 @@ jobs:
           Pin-Priority: -1
           PREFE
 
-          # Blokir snapd + deb transisi (thunderbird/firefox -> snap). Ketiganya
-          # hanya Recommends (bukan Depends) dari ubuntu-desktop, jadi aman
-          # di-skip. thunderbird transisi memaksa 'snap install thunderbird' +
-          # retry 30 menit ke store saat postinst (hang lama di runner). Pin
-          # dihapus lagi setelah install agar operasi apt lain normal.
-          sudo tee /etc/apt/preferences.d/99-no-snap.pref > /dev/null <<'PREFE'
-          Package: snapd thunderbird firefox
-          Pin: version *
-          Pin-Priority: -10
-          PREFE
-
+          # Blokir snapd + deb transisi (thunderbird/firefox -> snap) sudah
+          # dilakukan DI AWAL di STEP 01 (purge + hold + pin, sebelum upgrade).
+          # Pin masih aktif sampai baris rm di bawah; hold mencegah re-install
+          # oleh operasi apt berikutnya (VS Code, CRD, dll).
           # Perf build-time: --force-unsafe-io membuat dpkg unpack TANPA fsync
           # per file (aman di runner ephemeral; memangkas waktu unpack secara
           # nyata). ubuntu-desktop-minimal hanyalah SUBSET dari ubuntu-desktop,
@@ -192,25 +263,18 @@ jobs:
             virt-manager \
             gnome-boxes
 
+          # Pin 99-no-snap dibuat di STEP 01; hapus setelah install GNOME
+          # (hold snapd/thunderbird/firefox tetap mencegah re-install).
           sudo rm -f /etc/apt/preferences.d/99-no-snap.pref
 
-          # Hapus permanen snapd + deb transisi thunderbird/firefox. Tidak ada
-          # paket yang hard-Depends ke snapd di graph install ini (terverifikasi),
-          # jadi aman. Hold mencegah re-install oleh operasi apt berikutnya.
-          sudo eatmydata apt-get purge -y snapd thunderbird firefox || true
-          sudo apt-mark hold snapd thunderbird firefox
-          sudo rm -rf /snap /var/snap /var/lib/snapd /root/snap /home/runner/snap 2>/dev/null || true
-          command -v snap >/dev/null 2>&1 && echo -e "${C_YELLOW}[WARN] snap masih ada.${C_NC}" || echo -e "${C_GREEN}[OK] snap dihapus permanen.${C_NC}"
+          # Purge + hold + rm snap dirs sudah dilakukan di STEP 01 (paling awal).
 
           sudo rm -f /etc/apt/preferences.d/99-no-noto-heavy
           echo -e "${C_GREEN}[OK] Heavy Noto fonts (cjk / cjk-extra / extra) skipped (~285MB saved).${C_NC}"
 
           echo -e "${C_YELLOW}[INFO] Waiting for background pre-downloads...${C_NC}"
           wait $CHROME_DL || echo -e "${C_YELLOW}[WARN] chrome deb download gagal (fallback di step berikut).${C_NC}"
-          wait $VSC_KB_DL || echo -e "${C_YELLOW}[WARN] vscode key download gagal (fallback di step berikut).${C_NC}"
-          wait $OCD_DL || echo -e "${C_YELLOW}[WARN] opencode deb download gagal (fallback di step berikut).${C_NC}"
-          wait $CRD_KEY_DL || echo -e "${C_YELLOW}[WARN] crd key download gagal (fallback di step berikut).${C_NC}"
-          ls -l /tmp/google-chrome.deb /tmp/packages.microsoft.gpg /tmp/opencode-desktop.deb /tmp/linux_signing_key.pub 2>/dev/null || true
+          ls -l /tmp/google-chrome.deb 2>/dev/null || true
 
           echo -e "${C_YELLOW}[INFO] Compiling GSettings schemas...${C_NC}"
           sudo glib-compile-schemas /usr/share/glib-2.0/schemas/ || true
@@ -233,7 +297,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 03/17] SETUP REMOTE USER${C_NC}"
+          echo -e "${C_CYAN}[STEP 03/16] SETUP REMOTE USER${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Creating user 'runner'...${C_NC}"
@@ -281,7 +345,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 04/17] INSTALL GOOGLE CHROME${C_NC}"
+          echo -e "${C_CYAN}[STEP 04/16] INSTALL GOOGLE CHROME${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Downloading Google Chrome stable...${C_NC}"
@@ -306,28 +370,20 @@ jobs:
       # ============================================================
       - name: Install VS Code
         run: |
-          C_CYAN='\033[1;36m'; C_GREEN='\033[1;32m'; C_YELLOW='\033[1;33m'; C_NC='\033[0m'
+          C_CYAN='\033[1;36m'; C_GREEN='\033[1;32m'; C_YELLOW='\033[1;33m'; C_RED='\033[1;31m'; C_NC='\033[0m'
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 05/17] INSTALL VS CODE${C_NC}"
+          echo -e "${C_CYAN}[STEP 05/16] INSTALL VS CODE${C_NC}"
           echo "------------------------------------------------------------"
 
-          echo -e "${C_YELLOW}[INFO] Adding Microsoft repository...${C_NC}"
-          if [ -s /tmp/packages.microsoft.gpg ]; then
-            echo -e "${C_GREEN}[OK] MS signing key sudah ter-pre-download.${C_NC}"
-            sudo cp /tmp/packages.microsoft.gpg /etc/apt/keyrings/packages.microsoft.gpg
-          else
-            wget -qO- \
-              https://packages.microsoft.com/keys/microsoft.asc \
-              | gpg --dearmor \
-              | sudo tee /etc/apt/keyrings/packages.microsoft.gpg > /dev/null
+          # Repo VS Code sudah di-setup + di-update SATU kali di STEP 01.
+          # Di sini hanya verifikasi .list ada; install langsung tanpa apt-get update.
+          echo -e "${C_YELLOW}[INFO] Checking VS Code repository (configured in STEP 01)...${C_NC}"
+          if [ ! -f /etc/apt/sources.list.d/vscode.list ]; then
+            echo -e "${C_RED}[FAIL] /etc/apt/sources.list.d/vscode.list tidak ada (setup STEP 01 gagal).${C_NC}"
+            exit 1
           fi
-
-          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" \
-            | sudo tee /etc/apt/sources.list.d/vscode.list > /dev/null
-
-          sudo apt-get update
 
           echo -e "${C_YELLOW}[INFO] Installing VS Code...${C_NC}"
           sudo NEEDRESTART_MODE=l DEBIAN_FRONTEND=noninteractive eatmydata apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-unsafe-io" -o Dpkg::Use-Pty=0 code
@@ -344,7 +400,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 06/17] INSTALL OPENCODE CLI${C_NC}"
+          echo -e "${C_CYAN}[STEP 06/16] INSTALL OPENCODE CLI${C_NC}"
           echo "------------------------------------------------------------"
 
           # curl sudah tersedia di image ubuntu-24.04, tidak perlu install.
@@ -370,68 +426,24 @@ jobs:
 
 
       # ============================================================
-      # INSTALL OPENCODE DESKTOP
-      # ============================================================
-      - name: Install OpenCode Desktop
-        run: |
-          C_CYAN='\033[1;36m'; C_GREEN='\033[1;32m'; C_YELLOW='\033[1;33m'; C_NC='\033[0m'
-
-          echo ""
-          echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 07/17] INSTALL OPENCODE DESKTOP${C_NC}"
-          echo "------------------------------------------------------------"
-
-          echo -e "${C_YELLOW}[INFO] Downloading OpenCode Desktop (.deb latest)...${C_NC}"
-          if [ -s /tmp/opencode-desktop.deb ]; then
-            echo -e "${C_GREEN}[OK] OpenCode Desktop .deb sudah ter-pre-download.${C_NC}"
-          else
-            wget -q https://opencode.ai/download/stable/linux-x64-deb \
-              -O /tmp/opencode-desktop.deb
-          fi
-
-          echo -e "${C_YELLOW}[INFO] Installing .deb package...${C_NC}"
-          sudo NEEDRESTART_MODE=l DEBIAN_FRONTEND=noninteractive eatmydata apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-unsafe-io" -o Dpkg::Use-Pty=0 /tmp/opencode-desktop.deb
-
-          rm -f /tmp/opencode-desktop.deb
-
-          echo "------------------------------------------------------------"
-          dpkg -l | grep -i opencode || true
-          ls /usr/share/applications/*opencode* || true
-          which opencode-desktop || true
-          echo "------------------------------------------------------------"
-
-          echo -e "${C_GREEN}[OK] OpenCode Desktop installed.${C_NC}"
-
-
-      # ============================================================
       # INSTALL CHROME REMOTE DESKTOP
       # ============================================================
       - name: Install Chrome Remote Desktop
         run: |
-          C_CYAN='\033[1;36m'; C_GREEN='\033[1;32m'; C_YELLOW='\033[1;33m'; C_NC='\033[0m'
+          C_CYAN='\033[1;36m'; C_GREEN='\033[1;32m'; C_YELLOW='\033[1;33m'; C_RED='\033[1;31m'; C_NC='\033[0m'
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 08/17] INSTALL CHROME REMOTE DESKTOP${C_NC}"
+          echo -e "${C_CYAN}[STEP 07/16] INSTALL CHROME REMOTE DESKTOP${C_NC}"
           echo "------------------------------------------------------------"
 
-          echo -e "${C_YELLOW}[INFO] Adding Google CRD repository...${C_NC}"
-
-          if [ -s /tmp/linux_signing_key.pub ]; then
-            echo -e "${C_GREEN}[OK] Google signing key sudah ter-pre-download.${C_NC}"
-            gpg --dearmor < /tmp/linux_signing_key.pub \
-              | sudo tee /etc/apt/keyrings/google-linux.gpg > /dev/null
-          else
-            wget -qO- \
-              https://dl.google.com/linux/linux_signing_key.pub \
-              | gpg --dearmor \
-              | sudo tee /etc/apt/keyrings/google-linux.gpg > /dev/null
+          # Repo CRD sudah di-setup + di-update SATU kali di STEP 01.
+          # Di sini hanya verifikasi .list ada; install langsung tanpa apt-get update.
+          echo -e "${C_YELLOW}[INFO] Checking CRD repository (configured in STEP 01)...${C_NC}"
+          if [ ! -f /etc/apt/sources.list.d/chrome-remote-desktop.list ]; then
+            echo -e "${C_RED}[FAIL] /etc/apt/sources.list.d/chrome-remote-desktop.list tidak ada (setup STEP 01 gagal).${C_NC}"
+            exit 1
           fi
-
-          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-linux.gpg] http://dl.google.com/linux/chrome-remote-desktop/deb/ stable main" \
-            | sudo tee /etc/apt/sources.list.d/chrome-remote-desktop.list > /dev/null
-
-          sudo apt-get update
 
           echo -e "${C_YELLOW}[INFO] Installing chrome-remote-desktop...${C_NC}"
           sudo NEEDRESTART_MODE=l DEBIAN_FRONTEND=noninteractive eatmydata apt-get install -y \
@@ -444,7 +456,7 @@ jobs:
           echo -e "${C_GREEN}[OK] Chrome Remote Desktop installed.${C_NC}"
 
       # Simpan arsip .deb ke cache GitHub SEKARANG (sebelum register) —
-      # kalau STEP 15 gagal & user re-run, install tidak perlu unduh ulang.
+      # kalau STEP 14 gagal & user re-run, install tidak perlu unduh ulang.
       - name: Sync apt cache for GitHub save
         run: |
           sudo mkdir -p /home/runner/apt-archives
@@ -464,7 +476,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 09/17] CONFIGURE GNOME SESSION${C_NC}"
+          echo -e "${C_CYAN}[STEP 08/16] CONFIGURE GNOME SESSION${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Detecting available GNOME session...${C_NC}"
@@ -574,7 +586,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 10/17] DISABLE SCREENSAVER / LOCK + PERFORMANCE TUNES${C_NC}"
+          echo -e "${C_CYAN}[STEP 09/16] DISABLE SCREENSAVER / LOCK + PERFORMANCE TUNES${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Disabling GNOME lock/suspend system-wide...${C_NC}"
@@ -639,7 +651,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 11/17] INSTALL SAFE-UPGRADE HELPER${C_NC}"
+          echo -e "${C_CYAN}[STEP 10/16] INSTALL SAFE-UPGRADE HELPER${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Copying repo scripts/safe-upgrade.sh...${C_NC}"
@@ -685,7 +697,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 12/17] CREATE DESKTOP SHORTCUTS${C_NC}"
+          echo -e "${C_CYAN}[STEP 11/16] CREATE DESKTOP SHORTCUTS${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Creating Antigravity shortcut...${C_NC}"
@@ -712,25 +724,6 @@ jobs:
           Terminal=false
           EOF'
 
-          # OpenCode Desktop (.deb sudah menyediakan .desktop di
-          # /usr/share/applications, tinggal salin ke Desktop).
-          # Fallback: buat manual jika file tidak ditemukan.
-          echo -e "${C_YELLOW}[INFO] Linking OpenCode shortcut...${C_NC}"
-          if ls /usr/share/applications/*opencode*.desktop 1> /dev/null 2>&1; then
-            cp /usr/share/applications/*opencode*.desktop /home/runner/Desktop/ || true
-          else
-            sudo -u runner bash -c 'cat > /home/runner/Desktop/OpenCode.desktop <<EOF
-          [Desktop Entry]
-          Version=1.0
-          Type=Application
-          Name=OpenCode
-          Comment=OpenCode Desktop
-          Exec=opencode-desktop
-          Icon=opencode-desktop
-          Terminal=false
-          EOF'
-          fi
-
           sudo chmod +x /home/runner/Desktop/*.desktop
 
           sudo chown -R runner:runner /home/runner/Desktop
@@ -751,7 +744,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 13/17] SET WALLPAPER${C_NC}"
+          echo -e "${C_CYAN}[STEP 12/16] SET WALLPAPER${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Downloading Catppuccin 'black unicat' wallpaper...${C_NC}"
@@ -808,7 +801,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 14/17] CONFIGURE CRD PIN${C_NC}"
+          echo -e "${C_CYAN}[STEP 13/16] CONFIGURE CRD PIN${C_NC}"
           echo "------------------------------------------------------------"
 
           if [ -n "$CUSTOM_CRD_PIN" ]; then
@@ -844,7 +837,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 15/17] REGISTER CHROME REMOTE DESKTOP${C_NC}"
+          echo -e "${C_CYAN}[STEP 14/16] REGISTER CHROME REMOTE DESKTOP${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Validating host command input...${C_NC}"
@@ -926,7 +919,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 16/17] VERIFY INSTALLATION${C_NC}"
+          echo -e "${C_CYAN}[STEP 15/16] VERIFY INSTALLATION${C_NC}"
           echo "------------------------------------------------------------"
 
           echo "::group::[CHECK] System"
@@ -973,12 +966,6 @@ jobs:
           echo "::group::[CHECK] OpenCode CLI"
           opencode --version || true
           which opencode || true
-          echo "::endgroup::"
-
-          echo "::group::[CHECK] OpenCode Desktop"
-          dpkg -l | grep -i opencode || true
-          ls /usr/share/applications/*opencode* || true
-          ls /home/runner/Desktop/*pencode*.desktop || true
           echo "::endgroup::"
 
           echo "::group::[CHECK] Chrome Remote Desktop service"

@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 360
 
     steps:
@@ -21,7 +21,7 @@ jobs:
       # 10 detik: kalau spesifikasi sesuai, biarkan lanjut. Kalau tidak
       # sesuai, CANCEL workflow di UI GitHub sebelum timeout.
       # ============================================================
-      - name: VM Spec Check (10s to cancel)
+      - name: VM Spec Check (30s to cancel)
         run: |
           C_CYAN='\033[1;36m'; C_GREEN='\033[1;32m'; C_YELLOW='\033[1;33m'; C_RED='\033[1;31m'; C_NC='\033[0m'
           CORE_COUNT=$(nproc)
@@ -44,7 +44,7 @@ jobs:
           echo -e "${C_RED}[INFO] Jika TIDAK sesuai, CANCEL workflow sekarang (10 detik).${C_NC}"
           echo "=============================================================="
           echo ""
-          sleep 10
+          sleep 30
           echo -e "${C_GREEN}[OK] Lanjut instalasi (spesifikasi disetujui / tidak di-cancel).${C_NC}"
 
       - name: Checkout repository (for safe-upgrade helper)

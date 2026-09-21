@@ -1,4 +1,4 @@
-name: beta gnome
+name: gnome x pterodactyl
 
 on:
   workflow_dispatch:

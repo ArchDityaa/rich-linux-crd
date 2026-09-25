@@ -261,6 +261,9 @@ jobs:
             libvirt-clients \
             virtinst \
             virt-manager \
+            xsel \
+            xclip \
+            wl-clipboard \
             gnome-boxes
 
           # Pin 99-no-snap dibuat di STEP 01; hapus setelah install GNOME

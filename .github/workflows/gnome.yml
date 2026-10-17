@@ -42,6 +42,50 @@ jobs:
           echo -e "${C_CYAN}[STEP 01/18] PREPARE SYSTEM${C_NC}"
           echo "------------------------------------------------------------"
 
+          # ============================================================
+          # TIMEZONE -> ASIA/JAKARTA (WIB, UTC+7)
+          #
+          # Runner GitHub default-nya UTC, jadi jam di GNOME/CRD meleset 7 jam
+          # dari waktu Indonesia. Di-set sedini mungkin di step ini supaya
+          # semua log, timestamp file, dan jam desktop sesi CRD langsung WIB.
+          #
+          # Catatan penting: `timedatectl set-timezone` memperbarui
+          # /etc/localtime + state systemd, TAPI TIDAK memperbarui
+          # /etc/timezone. Tool lama (dpkg/tzdata dsb.) membaca /etc/timezone,
+          # jadi keduanya harus disamakan supaya tidak "balik" ke UTC.
+          # ============================================================
+          TZ_TARGET="Asia/Jakarta"
+
+          echo -e "${C_YELLOW}[INFO] Setting timezone to $TZ_TARGET (WIB, UTC+7)...${C_NC}"
+
+          if [ ! -e "/usr/share/zoneinfo/$TZ_TARGET" ]; then
+            echo -e "${C_RED}[FAIL] zoneinfo $TZ_TARGET tidak tersedia.${C_NC}"
+            exit 1
+          fi
+
+          # 1) Cara utama (systemd). Gagal pun tidak masalah -> ada fallback.
+          sudo timedatectl set-timezone "$TZ_TARGET" 2>/dev/null || true
+
+          # 2) Fallback/jaminan: /etc/timezone + symlink /etc/localtime
+          #    (cara ini juga benar untuk environment tanpa systemd).
+          echo "$TZ_TARGET" | sudo tee /etc/timezone > /dev/null
+          sudo ln -sf "/usr/share/zoneinfo/$TZ_TARGET" /etc/localtime
+
+          # 3) Sinkronkan metadata debconf tzdata agar tidak ditanya lagi dan
+          #    tidak kembali ke UTC saat package tzdata di-upgrade nanti.
+          sudo DEBIAN_FRONTEND=noninteractive dpkg-reconfigure -f noninteractive tzdata > /dev/null 2>&1 || true
+
+          # 4) Tegaskan ulang symlink sesudah reconfigure, lalu verifikasi.
+          sudo ln -sf "/usr/share/zoneinfo/$TZ_TARGET" /etc/localtime
+          if [ "$(cat /etc/timezone 2>/dev/null)" != "$TZ_TARGET" ] || [ "$(date +%z)" != "+0700" ]; then
+            echo -e "${C_RED}[FAIL] timezone tidak ter-set ke $TZ_TARGET.${C_NC}"
+            cat /etc/timezone || true
+            ls -l /etc/localtime || true
+            date || true
+            exit 1
+          fi
+          echo -e "${C_GREEN}[OK] Timezone: $(date +'%Z %z') | $(date)${C_NC}"
+
           __prepare_start=$(date +%s)
 
           echo -e "${C_YELLOW}[INFO] Disabling needrestart entirely (no noisy logs, no auto-restart)...${C_NC}"
@@ -1042,6 +1086,17 @@ jobs:
             echo -e "${C_GREEN}[OK] target resolusi 1024x768 (mode native driver dummy, tahan reload shell).${C_NC}"
           else
             echo "[WARN] target resolusi tidak konsisten."
+          fi
+          echo "::endgroup::"
+
+          echo "::group::[CHECK] timezone (Asia/Jakarta)"
+          cat /etc/timezone || true
+          ls -l /etc/localtime || true
+          date || true
+          if [ "$(cat /etc/timezone 2>/dev/null)" = "Asia/Jakarta" ] && [ "$(date +%z)" = "+0700" ]; then
+            echo -e "${C_GREEN}[OK] timezone WIB (Asia/Jakarta, +0700).${C_NC}"
+          else
+            echo "[WARN] timezone bukan Asia/Jakarta."
           fi
           echo "::endgroup::"
 

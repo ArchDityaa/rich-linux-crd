@@ -39,7 +39,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 01/18] PREPARE SYSTEM${C_NC}"
+          echo -e "${C_CYAN}[STEP 01/19] PREPARE SYSTEM${C_NC}"
           echo "------------------------------------------------------------"
 
           # ============================================================
@@ -155,7 +155,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 02/18] INSTALL GNOME DESKTOP${C_NC}"
+          echo -e "${C_CYAN}[STEP 02/19] INSTALL GNOME DESKTOP${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Installing full GNOME desktop (approx 2GB, please wait)...${C_NC}"
@@ -239,7 +239,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 03/18] SETUP REMOTE USER${C_NC}"
+          echo -e "${C_CYAN}[STEP 03/19] SETUP REMOTE USER${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Creating user 'runner'...${C_NC}"
@@ -287,7 +287,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 04/18] INSTALL GOOGLE CHROME${C_NC}"
+          echo -e "${C_CYAN}[STEP 04/19] INSTALL GOOGLE CHROME${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Downloading Google Chrome stable...${C_NC}"
@@ -312,7 +312,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 05/18] INSTALL VS CODE${C_NC}"
+          echo -e "${C_CYAN}[STEP 05/19] INSTALL VS CODE${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Adding Microsoft repository...${C_NC}"
@@ -341,7 +341,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 06/18] INSTALL OPENCODE CLI${C_NC}"
+          echo -e "${C_CYAN}[STEP 06/19] INSTALL OPENCODE CLI${C_NC}"
           echo "------------------------------------------------------------"
 
           sudo apt-get update
@@ -375,7 +375,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 07/18] INSTALL OPENCODE DESKTOP${C_NC}"
+          echo -e "${C_CYAN}[STEP 07/19] INSTALL OPENCODE DESKTOP${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Downloading OpenCode Desktop (.deb latest)...${C_NC}"
@@ -405,7 +405,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 08/18] INSTALL CHROME REMOTE DESKTOP${C_NC}"
+          echo -e "${C_CYAN}[STEP 08/19] INSTALL CHROME REMOTE DESKTOP${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Adding Google CRD repository...${C_NC}"
@@ -450,7 +450,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 09/18] CONFIGURE GNOME SESSION${C_NC}"
+          echo -e "${C_CYAN}[STEP 09/19] CONFIGURE GNOME SESSION${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Detecting available GNOME session...${C_NC}"
@@ -578,7 +578,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 10/18] DISABLE SCREENSAVER AND LOCK${C_NC}"
+          echo -e "${C_CYAN}[STEP 10/19] DISABLE SCREENSAVER AND LOCK${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Disabling GNOME lock/suspend system-wide...${C_NC}"
@@ -639,7 +639,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 11/18] ENABLE ANIMATIONS ON SOFTWARE RENDERING${C_NC}"
+          echo -e "${C_CYAN}[STEP 11/19] ENABLE ANIMATIONS ON SOFTWARE RENDERING${C_NC}"
           echo "------------------------------------------------------------"
 
           UUID="force-animations@software-rendering"
@@ -654,7 +654,7 @@ jobs:
             "name": "Force Animations on Software Rendering",
             "description": "Re-enables GNOME Shell animations on VMs, headless/CI desktops, Chrome Remote Desktop and any GPU-less environment that renders with llvmpipe/swrast, where GNOME Shell silently disables every animation.",
             "shell-version": ["45", "46", "47", "48", "49", "50"],
-            "version-name": "1.0.0"
+            "version-name": "1.1.0"
           }
           META_EOF
 
@@ -673,6 +673,10 @@ jobs:
            * Shell.Global property, blurb "Force animations to be enabled").
            * There is no GSetting and no environment variable for it, so it can
            * only be set from inside the shell -- i.e. from an extension.
+           *
+           * This extension additionally applies St.Settings.slow_down_factor so
+           * animations run in slow motion (default factor 2.5, overridable via
+           * the GNOME_SHELL_SLOWDOWN_FACTOR environment variable).
            */
 
           import GLib from 'gi://GLib';
@@ -681,14 +685,25 @@ jobs:
           import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
           const LOG_PREFIX = '[force-animations]';
+          const DEFAULT_SLOWDOWN = 2.5;
 
           export default class ForceAnimationsExtension extends Extension {
               enable() {
                   this._previousForceAnimations = global.force_animations;
+                  this._previousSlowDownFactor = St.Settings.get().slow_down_factor;
                   this._idleId = 0;
 
-                  const before = St.Settings.get().enable_animations;
+                  const slowdownEnv = GLib.getenv('GNOME_SHELL_SLOWDOWN_FACTOR');
+                  const factor = slowdownEnv
+                      ? (parseFloat(slowdownEnv) || DEFAULT_SLOWDOWN)
+                      : DEFAULT_SLOWDOWN;
+
                   global.force_animations = true;
+                  if (!isNaN(factor) && factor > 0.0) {
+                      St.Settings.get().slow_down_factor = factor;
+                  }
+
+                  const before = St.Settings.get().enable_animations;
 
                   this._idleId = GLib.idle_add(GLib.PRIORITY_LOW, () => {
                       this._idleId = 0;
@@ -696,8 +711,9 @@ jobs:
                       console.log(
                           `${LOG_PREFIX} software_rendering=` +
                           `${!global.backend.is_rendering_hardware_accelerated()} ` +
-                          `effective_enable_animations_before=${before} ` +
-                          `effective_enable_animations_now=${settings.enable_animations}`);
+                          `enable_animations_before=${before} ` +
+                          `enable_animations_now=${settings.enable_animations} ` +
+                          `slow_down_factor=${settings.slow_down_factor}`);
                       return GLib.SOURCE_REMOVE;
                   });
               }
@@ -708,12 +724,23 @@ jobs:
                       this._idleId = 0;
                   }
                   global.force_animations = this._previousForceAnimations ?? false;
+                  if (this._previousSlowDownFactor !== undefined) {
+                      St.Settings.get().slow_down_factor = this._previousSlowDownFactor;
+                  }
               }
           }
           JS_EOF
 
           sudo chmod 0755 "$EXT_DIR"
           sudo chmod 0644 "$EXT_DIR/metadata.json" "$EXT_DIR/extension.js"
+
+          echo -e "${C_YELLOW}[INFO] Writing system-wide animation slow-down env...${C_NC}"
+          sudo mkdir -p /etc/environment.d
+          printf 'GNOME_SHELL_SLOWDOWN_FACTOR=2.5\n' | sudo tee /etc/environment.d/99-gnome-animation-slow.conf > /dev/null
+          # Fallback untuk login via PAM (GDM/lightdm) agar env ikut tersedia.
+          if ! grep -q 'GNOME_SHELL_SLOWDOWN_FACTOR' /etc/environment 2>/dev/null; then
+              printf '\nGNOME_SHELL_SLOWDOWN_FACTOR=2.5\n' | sudo tee -a /etc/environment > /dev/null
+          fi
 
           echo -e "${C_YELLOW}[INFO] Enabling extension system-wide via dconf...${C_NC}"
           sudo mkdir -p /etc/dconf/db/local.d
@@ -741,9 +768,13 @@ jobs:
           sudo -u runner dbus-run-session -- gsettings get org.gnome.shell enabled-extensions || true
           echo "--- enable-animations (runner) ---"
           sudo -u runner dbus-run-session -- gsettings get org.gnome.desktop.interface enable-animations || true
+          echo "--- animation slow-down env (system) ---"
+          sudo cat /etc/environment.d/99-gnome-animation-slow.conf 2>/dev/null || true
+          echo "--- animation slow-down env (user) ---"
+          sudo -u runner cat /home/runner/.config/environment.d/99-gnome-animation-slow.conf 2>/dev/null || true
           echo "------------------------------------------------------------"
 
-          echo -e "${C_GREEN}[OK] Animations diaktifkan lewat override global.force_animations.${C_NC}"
+          echo -e "${C_GREEN}[OK] Animations diaktifkan lewat override global.force_animations (slow_down_factor=2.5).${C_NC}"
 
 
       # ============================================================
@@ -756,7 +787,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 12/18] INSTALL SAFE-UPGRADE HELPER${C_NC}"
+          echo -e "${C_CYAN}[STEP 12/19] INSTALL SAFE-UPGRADE HELPER${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Copying repo scripts/safe-upgrade.sh...${C_NC}"
@@ -802,7 +833,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 13/18] CREATE DESKTOP SHORTCUTS${C_NC}"
+          echo -e "${C_CYAN}[STEP 13/19] CREATE DESKTOP SHORTCUTS${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Creating Antigravity shortcut...${C_NC}"
@@ -868,7 +899,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 14/18] SET WALLPAPER${C_NC}"
+          echo -e "${C_CYAN}[STEP 14/19] SET WALLPAPER${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Downloading Catppuccin 'black unicat' wallpaper...${C_NC}"
@@ -907,6 +938,139 @@ jobs:
 
 
       # ============================================================
+      # INSTALL CATPPUCCIN THEME (MACCHIATO + MAUVE)
+      #
+      # Tema desktop lengkap untuk sesi CRD:
+      #   1) Ikon Papirus + folder warna Catppuccin
+      #   2) Tema GTK2/3/4 (berisi juga gnome-shell + css libadwaita)
+      #   3) Override libadwaita di ~/.config/gtk-4.0 (Files, Settings, dll)
+      #   4) Kursor Catppuccin
+      #   5) Font JetBrainsMono Nerd Font
+      #   6) GNOME Shell theme via user-theme extension
+      #   7) Profil GNOME Terminal Catppuccin Macchiato
+      #
+      # Semua ditulis ke dconf user 'runner' lewat dbus-run-session (pola
+      # yang sama dengan STEP 10/11/14) supaya langsung terbaca saat sesi
+      # CRD menyala. Versi aset di-pin agar build reprodusibel.
+      # ============================================================
+      - name: Install Catppuccin Theme (Macchiato + Mauve)
+        run: |
+          C_CYAN='\033[1;36m'; C_GREEN='\033[1;32m'; C_YELLOW='\033[1;33m'; C_RED='\033[1;31m'; C_NC='\033[0m'
+          export DEBIAN_FRONTEND=noninteractive
+          export NEEDRESTART_MODE=l
+
+          echo ""
+          echo "------------------------------------------------------------"
+          echo -e "${C_CYAN}[STEP 15/19] INSTALL CATPPUCCIN THEME (MACCHIATO + MAUVE)${C_NC}"
+          echo "------------------------------------------------------------"
+
+          FLAVOR="macchiato"
+          ACCENT="mauve"
+          GTK_THEME="catppuccin-${FLAVOR}-${ACCENT}-standard+default"
+          CURSOR_THEME="catppuccin-${FLAVOR}-${ACCENT}-cursors"
+          RUSER="runner"
+          RHOME="/home/${RUSER}"
+
+          # ---- 1. Ikon Papirus + folder warna Catppuccin ----
+          echo -e "${C_YELLOW}[INFO] Installing Papirus icon theme + Catppuccin folders...${C_NC}"
+          sudo NEEDRESTART_MODE=l apt-get install -y \
+            -o Dpkg::Options::="--force-confdef" \
+            -o Dpkg::Options::="--force-confold" \
+            -o Dpkg::Use-Pty=0 \
+            papirus-icon-theme \
+            gnome-shell-extensions
+
+          rm -rf /tmp/papirus-folders
+          git clone --depth 1 https://github.com/catppuccin/papirus-folders.git /tmp/papirus-folders
+          wget -qO /tmp/papirus-folders-bin \
+            https://raw.githubusercontent.com/PapirusDevelopmentTeam/papirus-folders/master/papirus-folders
+          sudo install -m 0755 /tmp/papirus-folders-bin /usr/local/bin/papirus-folders
+          sudo cp -r /tmp/papirus-folders/src/. /usr/share/icons/Papirus/
+          sudo papirus-folders -C "cat-${FLAVOR}-${ACCENT}" --theme Papirus || true
+          sudo papirus-folders -C "cat-${FLAVOR}-${ACCENT}" --theme Papirus-Dark || true
+
+          # ---- 2. Tema GTK (GTK2/3/4 + gnome-shell + css libadwaita) ----
+          # Nama aset mengandung '+', jadi di URL di-encode ke %2B.
+          echo -e "${C_YELLOW}[INFO] Downloading Catppuccin GTK theme ($GTK_THEME)...${C_NC}"
+          sudo -u "$RUSER" mkdir -p "$RHOME/.themes" "$RHOME/.icons"
+          wget -qO /tmp/cat-gtk.zip \
+            "https://github.com/catppuccin/gtk/releases/download/v1.0.3/${GTK_THEME//+/%2B}.zip"
+          sudo -u "$RUSER" unzip -qo /tmp/cat-gtk.zip -d "$RHOME/.themes/"
+
+          # Override libadwaita: gtk.css + assets ke ~/.config/gtk-4.0 supaya
+          # aplikasi GTK4/libadwaita (Files, Settings, dll) ikut bertema.
+          sudo -u "$RUSER" mkdir -p "$RHOME/.config/gtk-4.0"
+          sudo -u "$RUSER" cp -r "$RHOME/.themes/$GTK_THEME/gtk-4.0/." "$RHOME/.config/gtk-4.0/"
+
+          # ---- 3. Kursor Catppuccin ----
+          echo -e "${C_YELLOW}[INFO] Downloading Catppuccin cursors...${C_NC}"
+          wget -qO /tmp/cat-cursors.zip \
+            "https://github.com/catppuccin/cursors/releases/download/v2.0.0/${CURSOR_THEME}.zip"
+          sudo -u "$RUSER" unzip -qo /tmp/cat-cursors.zip -d "$RHOME/.icons/"
+
+          # ---- 4. Font JetBrainsMono Nerd Font ----
+          echo -e "${C_YELLOW}[INFO] Downloading JetBrainsMono Nerd Font...${C_NC}"
+          sudo -u "$RUSER" mkdir -p "$RHOME/.local/share/fonts/JetBrainsMonoNerd"
+          wget -qO /tmp/cat-font.zip \
+            "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.1/JetBrainsMono.zip"
+          sudo -u "$RUSER" unzip -qo /tmp/cat-font.zip -d "$RHOME/.local/share/fonts/JetBrainsMonoNerd"
+          sudo -u "$RUSER" fc-cache -f "$RHOME/.local/share/fonts" >/dev/null 2>&1 || true
+
+          # ---- 5. Terapkan tema via gsettings (dconf user runner) ----
+          echo -e "${C_YELLOW}[INFO] Applying theme via gsettings (user: $RUSER)...${C_NC}"
+          set_gs() { sudo -u "$RUSER" dbus-run-session -- gsettings set "$@" || true; }
+          set_gs org.gnome.desktop.interface gtk-theme           "$GTK_THEME"
+          set_gs org.gnome.desktop.interface icon-theme          "Papirus-Dark"
+          set_gs org.gnome.desktop.interface cursor-theme        "$CURSOR_THEME"
+          set_gs org.gnome.desktop.interface color-scheme        "prefer-dark"
+          set_gs org.gnome.desktop.interface font-name           "JetBrainsMono Nerd Font 11"
+          set_gs org.gnome.desktop.interface document-font-name  "JetBrainsMono Nerd Font 11"
+          set_gs org.gnome.desktop.interface monospace-font-name "JetBrainsMono Nerd Font 12"
+
+          # ---- 6. GNOME Shell theme (user-theme extension) ----
+          # Saat build tidak ada shell yang berjalan, jadi `gnome-extensions
+          # enable` tidak bisa dipakai -> set enabled/disabled-extensions
+          # langsung via gsettings. enabled-extensions bersifat autoritatif,
+          # jadi cukup daftarkan force-animations + user-theme di sini.
+          THEME_EXT="user-theme@gnome-shell-extensions.gcampax.github.com"
+          ANIM_EXT="force-animations@software-rendering"
+          echo -e "${C_YELLOW}[INFO] Enabling user-theme extension + setting shell theme...${C_NC}"
+          set_gs org.gnome.shell disabled-extensions "[]"
+          set_gs org.gnome.shell enabled-extensions "['${ANIM_EXT}', '${THEME_EXT}']"
+          set_gs org.gnome.shell.extensions.user-theme name "$GTK_THEME"
+
+          # ---- 7. GNOME Terminal (profil Catppuccin Macchiato) ----
+          echo -e "${C_YELLOW}[INFO] Installing Catppuccin GNOME Terminal profile...${C_NC}"
+          rm -rf /tmp/cat-gnome-terminal
+          git clone --depth 1 https://github.com/catppuccin/gnome-terminal.git /tmp/cat-gnome-terminal
+          sudo -u "$RUSER" dbus-run-session -- bash -c \
+            'cd /tmp/cat-gnome-terminal && python3 install.py' || true
+          # Set profil Catppuccin Macchiato (uuid tetap dari skrip) sebagai default.
+          sudo -u "$RUSER" dbus-run-session -- dconf write \
+            /org/gnome/terminal/legacy/profiles:/default \
+            "'5083e06b-024e-46be-9cd2-892b814f1fc8'" || true
+
+          sudo chown -R "$RUSER:$RUSER" \
+            "$RHOME/.themes" "$RHOME/.icons" "$RHOME/.config" "$RHOME/.local" 2>/dev/null || true
+
+          # ---- 8. Bersihkan unduhan sementara ----
+          rm -f /tmp/cat-gtk.zip /tmp/cat-cursors.zip /tmp/cat-font.zip /tmp/papirus-folders-bin
+
+          echo "------------------------------------------------------------"
+          echo "--- themes (runner) ---"; ls "$RHOME/.themes" || true
+          echo "--- cursors (runner) ---"; ls "$RHOME/.icons" || true
+          echo "--- gsettings (runner) ---"
+          sudo -u "$RUSER" dbus-run-session -- gsettings get org.gnome.desktop.interface gtk-theme || true
+          sudo -u "$RUSER" dbus-run-session -- gsettings get org.gnome.desktop.interface icon-theme || true
+          sudo -u "$RUSER" dbus-run-session -- gsettings get org.gnome.desktop.interface cursor-theme || true
+          sudo -u "$RUSER" dbus-run-session -- gsettings get org.gnome.shell.extensions.user-theme name || true
+          sudo -u "$RUSER" dbus-run-session -- gsettings get org.gnome.Terminal.ProfilesList default || true
+          echo "------------------------------------------------------------"
+
+          echo -e "${C_GREEN}[OK] Catppuccin $FLAVOR + $ACCENT terpasang (GTK, Shell, libadwaita, ikon, kursor, font, terminal).${C_NC}"
+
+
+      # ============================================================
       # SET CRD PIN
       #
       # Default:
@@ -925,7 +1089,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 15/18] CONFIGURE CRD PIN${C_NC}"
+          echo -e "${C_CYAN}[STEP 16/19] CONFIGURE CRD PIN${C_NC}"
           echo "------------------------------------------------------------"
 
           if [ -n "$CUSTOM_CRD_PIN" ]; then
@@ -961,7 +1125,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 16/18] REGISTER CHROME REMOTE DESKTOP${C_NC}"
+          echo -e "${C_CYAN}[STEP 17/19] REGISTER CHROME REMOTE DESKTOP${C_NC}"
           echo "------------------------------------------------------------"
 
           echo -e "${C_YELLOW}[INFO] Validating host command input...${C_NC}"
@@ -1043,7 +1207,7 @@ jobs:
 
           echo ""
           echo "------------------------------------------------------------"
-          echo -e "${C_CYAN}[STEP 17/18] VERIFY INSTALLATION${C_NC}"
+          echo -e "${C_CYAN}[STEP 18/19] VERIFY INSTALLATION${C_NC}"
           echo "------------------------------------------------------------"
 
           echo "::group::[CHECK] System"
@@ -1086,6 +1250,24 @@ jobs:
             echo -e "${C_GREEN}[OK] target resolusi 1024x768 (mode native driver dummy, tahan reload shell).${C_NC}"
           else
             echo "[WARN] target resolusi tidak konsisten."
+          fi
+          echo "::endgroup::"
+
+          echo "::group::[CHECK] Catppuccin theme (macchiato + mauve)"
+          ls -d /home/runner/.themes/catppuccin-macchiato-mauve-standard+default || true
+          ls -d /home/runner/.icons/catppuccin-macchiato-mauve-cursors || true
+          ls /home/runner/.config/gtk-4.0/gtk.css || true
+          ls /home/runner/.local/share/fonts/JetBrainsMonoNerd/ | head -n 3 || true
+          echo "--- gsettings (runner) ---"
+          sudo -u runner dbus-run-session -- gsettings get org.gnome.desktop.interface gtk-theme || true
+          sudo -u runner dbus-run-session -- gsettings get org.gnome.desktop.interface icon-theme || true
+          sudo -u runner dbus-run-session -- gsettings get org.gnome.desktop.interface cursor-theme || true
+          sudo -u runner dbus-run-session -- gsettings get org.gnome.shell.extensions.user-theme name || true
+          sudo -u runner dbus-run-session -- gsettings get org.gnome.Terminal.ProfilesList default || true
+          if sudo -u runner dbus-run-session -- gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null | grep -q 'catppuccin-macchiato-mauve'; then
+            echo -e "${C_GREEN}[OK] Catppuccin theme aktif (GTK/Shell/ikon/kursor/font/terminal).${C_NC}"
+          else
+            echo "[WARN] Catppuccin theme tidak terpasang."
           fi
           echo "::endgroup::"
 
